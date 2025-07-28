@@ -1,0 +1,41 @@
+# Disable secret scanning for specific packages
+block-list-secret-scan: []  
+
+# Specify the main branch for policy checks
+branch: main  
+
+# Enable compact output for better readability
+compact: true  
+
+# Scan the current directory
+directory:
+- ./
+
+# Downloading external Terraform modules
+download-external-modules: true  
+
+# Evaluate Terraform variables for better analysis
+evaluate-variables: true  
+
+# Store external modules in this path
+external-modules-download-path: .external_modules  
+
+# Scan using all available frameworks
+framework:
+- all
+
+# No masking of results
+mask: []  
+
+# Suppress non-essential output
+quiet: true  
+
+# No specific file types for secret scanning
+secrets-scan-file-type: []  
+
+# Show the summary at the top of the report
+summary-position: top  
+
+# Exclude specific paths from scanning
+skip-path:
+- venv/  # Exclude virtual environment directory
