@@ -1,22 +1,3 @@
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "~> 4.37.0"
-    }
-  }
-}
-
-provider "azurerm" {
-  features {}
-}
-
-resource "azurerm_resource_group" "rg" {
-  name     = "${local.name_prefix}-resource-group"
-  location = var.rg_location
-  tags     = var.tags
-}
-
 locals {
   public_subnet1_id  = module.virtual_network.subnets["public_subnet1"].resource.id
   public_subnet2_id  = module.virtual_network.subnets["public_subnet2"].resource.id

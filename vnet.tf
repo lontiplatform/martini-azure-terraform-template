@@ -26,12 +26,14 @@ module "virtual_network" {
       }
     }
     "private_subnet1" = {
-      name             = "${local.name_prefix}-private-subnet-1"
-      address_prefixes = ["10.0.11.0/24"]
+      name              = "${local.name_prefix}-private-subnet-1"
+      address_prefixes  = ["10.0.11.0/24"]
+      service_endpoints = ["Microsoft.KeyVault"]
     }
     "private_subnet2" = {
-      name             = "${local.name_prefix}-private-subnet-2"
-      address_prefixes = ["10.0.12.0/24"]
+      name              = "${local.name_prefix}-private-subnet-2"
+      address_prefixes  = ["10.0.12.0/24"]
+      service_endpoints = ["Microsoft.KeyVault"]
     }
   }
 

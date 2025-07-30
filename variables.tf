@@ -19,3 +19,9 @@ variable "tags" {
     Repository  = "https://github.com/lontiplatform/martini-azure-terraform-template"
   }
 }
+
+// Application configuration
+variable "martini_workspace_license" {
+  description = "Full license text to be used with Martini"
+  type        = string
+}
