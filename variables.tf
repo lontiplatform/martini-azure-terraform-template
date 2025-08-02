@@ -25,3 +25,34 @@ variable "martini_workspace_license" {
   description = "Full license text to be used with Martini"
   type        = string
 }
+
+variable "martini_workspace_mysql_driver_version" {
+  description = "Version of the MySQL driver that should be automatically installed on Martini"
+  type        = string
+  default     = "8.3.0"
+}
+
+variable "martini_workspace_postgres_driver_version" {
+  description = "Version of the PostgreSQL driver that should be automatically installed on Martini"
+  type        = string
+  default     = "42.7.1"
+}
+
+// ACI configuration
+variable "aci_docker_image_url" {
+  description = "A URL to the Docker image used by the application"
+  type        = string
+  default     = "lontiplatform/martini-server-runtime:latest"
+}
+
+variable "cpu" {
+  description = "Number of CPU cores to allocate for the application."
+  type        = number
+  default     = 2
+}
+
+variable "memory" {
+  description = "Amount of memory (in GB) to allocate for the application"
+  type        = number
+  default     = 4
+}
