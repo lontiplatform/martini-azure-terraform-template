@@ -12,3 +12,24 @@ output "resource_group_location" {
 output "app_gw_url" {
   value = "http://${azurerm_public_ip.app_gw_pip.fqdn}"
 }
+
+// CIDRs
+output "private_subnet1_prefix" {
+  value = module.virtual_network.subnets["private_subnet1"].resource.body.properties.addressPrefixes[0]
+}
+
+
+output "private_subnet2_prefix" {
+  value = module.virtual_network.subnets["private_subnet2"].resource.body.properties.addressPrefixes[0]
+}
+
+
+output "public_subnet1_prefix" {
+  value = module.virtual_network.subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
+}
+
+
+output "public_subnet2_prefix" {
+  value = module.virtual_network.subnets["public_subnet2"].resource.body.properties.addressPrefixes[0]
+}
+

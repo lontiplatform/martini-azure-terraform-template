@@ -1,8 +1,12 @@
 locals {
-  public_subnet1_id  = module.virtual_network.subnets["public_subnet1"].resource.id
-  public_subnet2_id  = module.virtual_network.subnets["public_subnet2"].resource.id
-  private_subnet1_id = module.virtual_network.subnets["private_subnet1"].resource.id
-  private_subnet2_id = module.virtual_network.subnets["private_subnet2"].resource.id
+  public_subnet1_id    = module.virtual_network.subnets["public_subnet1"].resource.id
+  public_subnet2_id    = module.virtual_network.subnets["public_subnet2"].resource.id
+  private_subnet1_id   = module.virtual_network.subnets["private_subnet1"].resource.id
+  private_subnet2_id   = module.virtual_network.subnets["private_subnet2"].resource.id
+  public_subnet1_cidr  = module.virtual_network.subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
+  public_subnet2_cidr  = module.virtual_network.subnets["public_subnet2"].resource.body.properties.addressPrefixes[0]
+  private_subnet1_cidr = module.virtual_network.subnets["private_subnet1"].resource.body.properties.addressPrefixes[0]
+  private_subnet2_cidr = module.virtual_network.subnets["private_subnet2"].resource.body.properties.addressPrefixes[0]
 
   nsg_rules = {
     "AllowInternetOut" = {
@@ -37,7 +41,7 @@ locals {
       protocol                   = "Tcp"
       source_address_prefix      = "*"
       source_port_range          = "*"
-      destination_address_prefix = "10.0.1.0/24"
+      destination_address_prefix = local.public_subnet1_cidr
       destination_port_ranges    = ["80"]
     }
 
@@ -47,10 +51,10 @@ locals {
       direction                  = "Inbound"
       priority                   = 130
       protocol                   = "Tcp"
-      source_address_prefix      = "10.0.1.0/24"
+      source_address_prefix      = local.public_subnet1_cidr
       source_port_range          = "*"
-      destination_address_prefix = "10.0.11.0/24"
-      destination_port_ranges    = ["8080"]
+      destination_address_prefix = local.private_subnet1_cidr
+      destination_port_ranges    = ["${local.aci_container_port}"]
     }
 
 
@@ -59,7 +63,7 @@ locals {
   databases = {
     martini = {
       name        = var.sql_database_name
-      max_size_gb = 50
+      max_size_gb = var.max_size_gb
       sku_name    = "S0"
 
       tags = var.tags

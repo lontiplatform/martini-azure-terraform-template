@@ -83,6 +83,7 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="input_martini_workspace_license"></a> [martini\_workspace\_license](#input\_martini\_workspace\_license) | Full license text to be used with Martini | `string` | n/a | yes |
 | <a name="input_martini_workspace_mysql_driver_version"></a> [martini\_workspace\_mysql\_driver\_version](#input\_martini\_workspace\_mysql\_driver\_version) | Version of the MySQL driver that should be automatically installed on Martini | `string` | `"8.3.0"` | no |
 | <a name="input_martini_workspace_postgres_driver_version"></a> [martini\_workspace\_postgres\_driver\_version](#input\_martini\_workspace\_postgres\_driver\_version) | Version of the PostgreSQL driver that should be automatically installed on Martini | `string` | `"42.7.1"` | no |
+| <a name="input_max_size_gb"></a> [max\_size\_gb](#input\_max\_size\_gb) | The max size of the database in gigabytes. | `number` | `50` | no |
 | <a name="input_memory"></a> [memory](#input\_memory) | Amount of memory (in GB) to allocate for the application | `number` | `4` | no |
 | <a name="input_name_suffix"></a> [name\_suffix](#input\_name\_suffix) | Suffix to add to the resources' names | `string` | `""` | no |
 | <a name="input_rg_location"></a> [rg\_location](#input\_rg\_location) | Azure region to deploy resources into | `string` | n/a | yes |
@@ -96,6 +97,10 @@ run a few checks before the commit. The checks used are (in order of execution):
 | Name | Description |
 |------|-------------|
 | <a name="output_app_gw_url"></a> [app\_gw\_url](#output\_app\_gw\_url) | Application Gateway's URL |
+| <a name="output_private_subnet1_prefix"></a> [private\_subnet1\_prefix](#output\_private\_subnet1\_prefix) | CIDRs |
+| <a name="output_private_subnet2_prefix"></a> [private\_subnet2\_prefix](#output\_private\_subnet2\_prefix) | n/a |
+| <a name="output_public_subnet1_prefix"></a> [public\_subnet1\_prefix](#output\_public\_subnet1\_prefix) | n/a |
+| <a name="output_public_subnet2_prefix"></a> [public\_subnet2\_prefix](#output\_public\_subnet2\_prefix) | n/a |
 | <a name="output_resource_group_location"></a> [resource\_group\_location](#output\_resource\_group\_location) | The Azure region where the Martini resources are deployed. |
 | <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | Name of the resource group created for the application |
 <!-- END_TF_DOCS -->

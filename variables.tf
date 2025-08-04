@@ -81,3 +81,9 @@ variable "sql_database_name" {
   type        = string
   default     = "martini"
 }
+
+variable "max_size_gb" {
+  description = "The max size of the database in gigabytes."
+  type        = number
+  default     = 50
+}
