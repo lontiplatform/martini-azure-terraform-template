@@ -42,5 +42,5 @@ skip-path:
 
 skip-check:
 - CKV_TF_1
-- CKV_AZURE_224
-- CKV_AZURE_229
+- CKV_AZURE_224 # Ledger feature is currently not required for this template
+- CKV_AZURE_229 # Zone redundancy  is currently not required for this template
