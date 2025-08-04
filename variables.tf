@@ -56,3 +56,28 @@ variable "memory" {
   type        = number
   default     = 4
 }
+
+// SQL Server configuration
+variable "enable_sql_server" {
+  description = "Should Martini use SQL Server database?"
+  type        = bool
+  default     = false
+}
+
+variable "sql_server_admin_username" {
+  description = "Username to set in the SQl Server. Valid only if `enable_sql_server` is set to `true`"
+  type        = string
+  default     = null
+}
+
+variable "sql_server_version" {
+  description = "The RDS engine version to use. Valid only if `enable_sql_server` is set to `true`"
+  type        = string
+  default     = null
+}
+
+variable "sql_database_name" {
+  description = "Name of the SQL database. Valid only if `enable_sql_server` is set to `true`"
+  type        = string
+  default     = "martini"
+}

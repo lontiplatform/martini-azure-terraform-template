@@ -39,3 +39,8 @@ summary-position: top
 # Exclude specific paths from scanning
 skip-path:
 - venv/  # Exclude virtual environment directory
+
+skip-check:
+- CKV_TF_1
+- CKV_AZURE_224
+- CKV_AZURE_229

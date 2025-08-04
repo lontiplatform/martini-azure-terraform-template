@@ -13,7 +13,7 @@ resource "azurerm_container_group" "martini" {
     commands = [
       "bash",
       "-c",
-      "wget ${local.jdbc_postgres_download_url} -P /lib-ext/ && wget ${local.jdbc_mysql_download_url} -P /lib-ext/"
+      "wget ${local.jdbc_mysql_download_url} -P /lib-ext/"
     ]
 
     volume {

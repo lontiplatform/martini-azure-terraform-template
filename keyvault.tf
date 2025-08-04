@@ -36,3 +36,23 @@ resource "azurerm_key_vault_secret" "martini_workspace_license" {
 
   tags = var.tags
 }
+
+resource "azurerm_key_vault_secret" "sql_admin_password" {
+  #checkov:skip=CKV_AZURE_41:Skipping secret expiration
+  name         = "sql-admin-password"
+  value        = random_password.admin_password.result
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "secret"
+
+  tags = var.tags
+}
+
+resource "azurerm_key_vault_secret" "sql_admin_username" {
+  #checkov:skip=CKV_AZURE_41:Skipping secret expiration
+  name         = "sql-admin-username"
+  value        = var.sql_server_admin_username
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "username"
+
+  tags = var.tags
+}

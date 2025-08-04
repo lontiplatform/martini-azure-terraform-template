@@ -56,6 +56,17 @@ locals {
 
   }
 
+  databases = {
+    martini = {
+      name        = var.sql_database_name
+      max_size_gb = 50
+      sku_name    = "S0"
+
+      tags = var.tags
+
+    }
+  }
+
   name_prefix                = "${terraform.workspace}-martini${var.name_suffix}"
   aci_service_name           = "${local.name_prefix}-service"
   aci_container_port         = 8080
