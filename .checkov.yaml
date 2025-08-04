@@ -1,9 +1,6 @@
 # Disable secret scanning for specific packages
 block-list-secret-scan: []  
 
-# Specify the main branch for policy checks
-branch: main  
-
 # Enable compact output for better readability
 compact: true  
 
