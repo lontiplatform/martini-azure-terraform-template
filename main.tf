@@ -16,6 +16,44 @@ locals {
       source_address_prefix      = "*"
       source_port_range          = "*"
     }
+
+    "AllowAppGatewayInfraPorts" = {
+      name                       = "AllowAppGatewayInfraPorts"
+      access                     = "Allow"
+      direction                  = "Inbound"
+      priority                   = 100
+      protocol                   = "Tcp"
+      source_address_prefix      = "GatewayManager"
+      source_port_range          = "*"
+      destination_address_prefix = "*"
+      destination_port_ranges    = ["65200-65535"]
+    }
+
+    "AllowClientToAppGateway" = {
+      name                       = "AllowClientToAppGateway"
+      access                     = "Allow"
+      direction                  = "Inbound"
+      priority                   = 120
+      protocol                   = "Tcp"
+      source_address_prefix      = "*"
+      source_port_range          = "*"
+      destination_address_prefix = "10.0.1.0/24"
+      destination_port_ranges    = ["80"]
+    }
+
+    "AllowAppGatewayToBackend" = {
+      name                       = "AllowAppGatewayToBackend"
+      access                     = "Allow"
+      direction                  = "Inbound"
+      priority                   = 130
+      protocol                   = "Tcp"
+      source_address_prefix      = "10.0.1.0/24"
+      source_port_range          = "*"
+      destination_address_prefix = "10.0.11.0/24"
+      destination_port_ranges    = ["8080"]
+    }
+
+
   }
 
   name_prefix                = "${terraform.workspace}-martini${var.name_suffix}"
