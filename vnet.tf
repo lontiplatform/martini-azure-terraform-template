@@ -1,5 +1,4 @@
 module "virtual_network" {
-  #checkov:skip=CKV_TF_1:Module version is used instead of hash
   source  = "Azure/avm-res-network-virtualnetwork/azurerm"
   version = "~> 0.9.3"
 
@@ -55,7 +54,6 @@ module "virtual_network" {
 }
 
 module "route_table" {
-  #checkov:skip=CKV_TF_1:Module version is used instead of hash
   source  = "Azure/avm-res-network-routetable/azurerm"
   version = "~> 0.4.1"
 
@@ -80,7 +78,6 @@ module "route_table" {
 }
 
 module "nat_gw" {
-  #checkov:skip=CKV_TF_1:Module version is used instead of hash
   source  = "Azure/avm-res-network-natgateway/azurerm"
   version = "~> 0.2.1"
 
@@ -108,7 +105,6 @@ module "nat_gw" {
 }
 
 module "network_sg" {
-  #checkov:skip=CKV_TF_1:Module version is used instead of hash
   source  = "Azure/avm-res-network-networksecuritygroup/azurerm"
   version = "~> 0.5.0"
 

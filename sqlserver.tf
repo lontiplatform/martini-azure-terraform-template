@@ -5,9 +5,6 @@ resource "random_password" "admin_password" {
 }
 
 module "sql_server" {
-  #checkov:skip=CKV_TF_1:Module version is used instead of hash
-  #checkov:skip=CKV_AZURE_224:Ledger database is currently not required for this template
-  #checkov:skip=CKV_AZURE_229:Zone redundancy is currently not required for this template
   #checkov:skip=CKV_AZURE_23:Auditing is currently not required for this template
   #checkov:skip=CKV_AZURE_24:Auditing is currently not required for this template
   #checkov:skip=CKV2_AZURE_2:Vulnerability Assessment is currently not required for this template

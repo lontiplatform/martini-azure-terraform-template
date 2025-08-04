@@ -1,7 +1,6 @@
 resource "azurerm_key_vault" "key_vault" {
-  # TODO:SECURITY - Enable purge protection before production
-  #checkov:skip=CKV_AZURE_42:Skipping purge protection while developing the template
-  #checkov:skip=CKV_AZURE_110:Skipping purge protection while developing the template
+  #checkov:skip=CKV_AZURE_42:Purge protection is not required for this template
+  #checkov:skip=CKV_AZURE_110:Purge protection is not required for this template
   #checkov:skip=CKV2_AZURE_32:No need for private endpoint yet
   #checkov:skip=CKV_AZURE_109:Firewall does not provide flexibility to NAT template users
   #checkov:skip=CKV_AZURE_189:Buildtime requires public access to key vault

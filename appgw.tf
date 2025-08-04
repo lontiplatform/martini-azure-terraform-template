@@ -1,5 +1,4 @@
 module "app_gw" {
-  #checkov:skip=CKV_TF_1:Module version is used instead of hash
   #checkov:skip=CKV_AZURE_218:HTTPS is currently not required for this template
   source  = "Azure/avm-res-network-applicationgateway/azurerm"
   version = "~> 0.4.2"
