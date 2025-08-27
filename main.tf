@@ -1,6 +1,5 @@
 locals {
   public_subnet1_id    = module.virtual_network.subnets["public_subnet1"].resource.id
-  public_subnet2_id    = module.virtual_network.subnets["public_subnet2"].resource.id
   private_subnet1_id   = module.virtual_network.subnets["private_subnet1"].resource.id
   private_subnet2_id   = module.virtual_network.subnets["private_subnet2"].resource.id
   public_subnet1_cidr  = module.virtual_network.subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
