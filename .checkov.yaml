@@ -35,7 +35,7 @@ summary-position: top
 
 # Exclude specific paths from scanning
 skip-path:
-- venv/  # Exclude virtual environment directory
+- .venv/  # Exclude virtual environment directory
 
 skip-check:
 - CKV_TF_1
