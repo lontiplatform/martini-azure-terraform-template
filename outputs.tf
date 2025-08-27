@@ -29,3 +29,10 @@ output "public_subnet1_prefix" {
 output "public_subnet2_prefix" {
   value = module.virtual_network.subnets["public_subnet2"].resource.body.properties.addressPrefixes[0]
 }
+
+output "subnet_prefixes" {
+  value = {
+    for name, subnet in module.virtual_network.subnets :
+    name => subnet.resource.body.properties.addressPrefixes[0]
+  }
+}

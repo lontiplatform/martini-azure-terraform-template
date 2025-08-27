@@ -100,4 +100,5 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="output_public_subnet2_prefix"></a> [public\_subnet2\_prefix](#output\_public\_subnet2\_prefix) | n/a |
 | <a name="output_resource_group_location"></a> [resource\_group\_location](#output\_resource\_group\_location) | The Azure region where the Martini resources are deployed. |
 | <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | Name of the resource group created for the application |
+| <a name="output_subnet_prefixes"></a> [subnet\_prefixes](#output\_subnet\_prefixes) | n/a |
 <!-- END_TF_DOCS -->
