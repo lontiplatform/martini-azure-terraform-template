@@ -81,8 +81,6 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="input_cpu"></a> [cpu](#input\_cpu) | Number of CPU cores to allocate for the application. | `number` | `2` | no |
 | <a name="input_enable_sql_server"></a> [enable\_sql\_server](#input\_enable\_sql\_server) | Should Martini use SQL Server database? | `bool` | `false` | no |
 | <a name="input_martini_workspace_license"></a> [martini\_workspace\_license](#input\_martini\_workspace\_license) | Full license text to be used with Martini | `string` | n/a | yes |
-| <a name="input_martini_workspace_mysql_driver_version"></a> [martini\_workspace\_mysql\_driver\_version](#input\_martini\_workspace\_mysql\_driver\_version) | Version of the MySQL driver that should be automatically installed on Martini | `string` | `"8.3.0"` | no |
-| <a name="input_martini_workspace_postgres_driver_version"></a> [martini\_workspace\_postgres\_driver\_version](#input\_martini\_workspace\_postgres\_driver\_version) | Version of the PostgreSQL driver that should be automatically installed on Martini | `string` | `"42.7.1"` | no |
 | <a name="input_max_size_gb"></a> [max\_size\_gb](#input\_max\_size\_gb) | The max size of the database in gigabytes. | `number` | `50` | no |
 | <a name="input_memory"></a> [memory](#input\_memory) | Amount of memory (in GB) to allocate for the application | `number` | `4` | no |
 | <a name="input_name_suffix"></a> [name\_suffix](#input\_name\_suffix) | Suffix to add to the resources' names | `string` | `""` | no |
