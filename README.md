@@ -87,7 +87,9 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="input_sql_database_name"></a> [sql\_database\_name](#input\_sql\_database\_name) | Name of the SQL database. Valid only if `enable_sql_server` is set to `true` | `string` | `"martini"` | no |
 | <a name="input_sql_server_admin_username"></a> [sql\_server\_admin\_username](#input\_sql\_server\_admin\_username) | Username to set in the SQl Server. Valid only if `enable_sql_server` is set to `true` | `string` | `null` | no |
 | <a name="input_sql_server_version"></a> [sql\_server\_version](#input\_sql\_server\_version) | The RDS engine version to use. Valid only if `enable_sql_server` is set to `true` | `string` | `null` | no |
+| <a name="input_subnet_prefixes"></a> [subnet\_prefixes](#input\_subnet\_prefixes) | Prefix for each subnet | `map(list(string))` | <pre>{<br/>  "private_subnet1": [<br/>    "10.0.11.0/24"<br/>  ],<br/>  "private_subnet2": [<br/>    "10.0.12.0/24"<br/>  ],<br/>  "public_subnet1": [<br/>    "10.0.1.0/24"<br/>  ],<br/>  "public_subnet2": [<br/>    "10.0.2.0/24"<br/>  ]<br/>}</pre> | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Common tags for components created in the infrastructure | `map(string)` | <pre>{<br/>  "Application": "Martini",<br/>  "Repository": "https://github.com/lontiplatform/martini-azure-terraform-template"<br/>}</pre> | no |
+| <a name="input_vnet_address_space"></a> [vnet\_address\_space](#input\_vnet\_address\_space) | Virtual Network CIDR | `list(string)` | <pre>[<br/>  "10.0.0.0/18"<br/>]</pre> | no |
 
 ## Outputs
 

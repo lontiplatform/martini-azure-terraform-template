@@ -3,14 +3,14 @@ module "virtual_network" {
   version = "~> 0.9.3"
 
   name                = "${local.name_prefix}-vnet"
-  address_space       = ["10.0.0.0/18"]
+  address_space       = var.vnet_address_space
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
   subnets = {
     "public_subnet1" = {
       name                            = "${local.name_prefix}-public-subnet-1"
-      address_prefixes                = ["10.0.1.0/24"]
+      address_prefixes                = var.subnet_prefixes["public_subnet1"]
       default_outbound_access_enabled = true
       network_security_group = {
         id = module.network_sg.resource_id
@@ -18,7 +18,7 @@ module "virtual_network" {
     }
     "public_subnet2" = {
       name                            = "${local.name_prefix}-public-subnet-2"
-      address_prefixes                = ["10.0.2.0/24"]
+      address_prefixes                = var.subnet_prefixes["public_subnet2"]
       default_outbound_access_enabled = true
       network_security_group = {
         id = module.network_sg.resource_id
@@ -26,7 +26,7 @@ module "virtual_network" {
     }
     "private_subnet1" = {
       name              = "${local.name_prefix}-private-subnet-1"
-      address_prefixes  = ["10.0.11.0/24"]
+      address_prefixes  = var.subnet_prefixes["private_subnet1"]
       service_endpoints = ["Microsoft.KeyVault"]
       delegation = [{
         name = "aciDelegation"
@@ -38,7 +38,7 @@ module "virtual_network" {
     }
     "private_subnet2" = {
       name              = "${local.name_prefix}-private-subnet-2"
-      address_prefixes  = ["10.0.12.0/24"]
+      address_prefixes  = var.subnet_prefixes["private_subnet2"]
       service_endpoints = ["Microsoft.KeyVault"]
       delegation = [{
         name = "aciDelegation"

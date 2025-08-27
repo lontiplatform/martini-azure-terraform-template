@@ -75,3 +75,21 @@ variable "max_size_gb" {
   type        = number
   default     = 50
 }
+
+// Virtual Network configuration
+variable "subnet_prefixes" {
+  description = "Prefix for each subnet"
+  type        = map(list(string))
+  default = {
+    public_subnet1  = ["10.0.1.0/24"]
+    public_subnet2  = ["10.0.2.0/24"]
+    private_subnet1 = ["10.0.11.0/24"]
+    private_subnet2 = ["10.0.12.0/24"]
+  }
+}
+
+variable "vnet_address_space" {
+  description = "Virtual Network CIDR"
+  type        = list(string)
+  default     = ["10.0.0.0/18"]
+}
