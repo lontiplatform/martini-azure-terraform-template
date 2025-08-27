@@ -6,23 +6,6 @@ resource "azurerm_container_group" "martini" {
   ip_address_type     = "Private"
   os_type             = "Linux"
 
-  init_container {
-    name  = "bash"
-    image = "bash:5"
-
-    commands = [
-      "bash",
-      "-c",
-      "wget ${local.jdbc_mysql_download_url} -P /lib-ext/"
-    ]
-
-    volume {
-      empty_dir  = true
-      name       = "lib-ext"
-      mount_path = "/lib-ext"
-    }
-  }
-
   container {
     name   = local.aci_service_name
     image  = var.aci_docker_image_url
@@ -34,12 +17,6 @@ resource "azurerm_container_group" "martini" {
 
     ports {
       port = local.aci_container_port
-    }
-
-    volume {
-      empty_dir  = true
-      name       = "lib-ext"
-      mount_path = "/lib-ext"
     }
 
     secure_environment_variables = {
