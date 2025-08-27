@@ -3,7 +3,6 @@
 The repository contains a Terraform template to create a complete infrastructure running Martini Runtime in the cloud 
 on Azure ACI along with optional dependency such as an SQL database.
 
-**Note:** This template downloads required JDBC drivers automatically, but Martini doesn't embed the drivers by default
 
 # Requirements
 
