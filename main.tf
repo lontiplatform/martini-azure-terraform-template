@@ -7,6 +7,11 @@ locals {
   private_subnet1_cidr = module.virtual_network.subnets["private_subnet1"].resource.body.properties.addressPrefixes[0]
   private_subnet2_cidr = module.virtual_network.subnets["private_subnet2"].resource.body.properties.addressPrefixes[0]
 
+  private_subnet_ids = [
+    for k, v in module.virtual_network.subnets : v.resource.id
+    if startswith(k, "private_subnet")
+  ]
+
   nsg_rules = {
     "AllowInternetOut" = {
       name                       = "AllowInternetOut"

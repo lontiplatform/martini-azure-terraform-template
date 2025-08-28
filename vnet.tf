@@ -7,48 +7,34 @@ module "virtual_network" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
-  subnets = {
-    "public_subnet1" = {
-      name                            = "${local.name_prefix}-public-subnet-1"
-      address_prefixes                = [for i, cidr in var.public_subnet_cidrs : cidr if i == 0]
-      default_outbound_access_enabled = true
-      network_security_group = {
-        id = module.network_sg.resource_id
+  subnets = merge(
+    {
+      for i, cidr in var.public_subnet_cidrs :
+      "public_subnet${i + 1}" => {
+        name                            = "${local.name_prefix}-public-subnet-${i + 1}"
+        address_prefixes                = [cidr]
+        default_outbound_access_enabled = true
+        network_security_group = {
+          id = module.network_sg.resource_id
+        }
+      }
+    },
+    {
+      for i, cidr in var.private_subnet_cidrs :
+      "private_subnet${i + 1}" => {
+        name              = "${local.name_prefix}-private-subnet-${i + 1}"
+        address_prefixes  = [cidr]
+        service_endpoints = ["Microsoft.KeyVault"]
+        delegation = [{
+          name = "aciDelegation"
+          service_delegation = {
+            name    = "Microsoft.ContainerInstance/containerGroups"
+            actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+          }
+        }]
       }
     }
-    "public_subnet2" = {
-      name                            = "${local.name_prefix}-public-subnet-2"
-      address_prefixes                = [for i, cidr in var.public_subnet_cidrs : cidr if i == 1]
-      default_outbound_access_enabled = true
-      network_security_group = {
-        id = module.network_sg.resource_id
-      }
-    }
-    "private_subnet1" = {
-      name              = "${local.name_prefix}-private-subnet-1"
-      address_prefixes  = [for i, cidr in var.private_subnet_cidrs : cidr if i == 0]
-      service_endpoints = ["Microsoft.KeyVault"]
-      delegation = [{
-        name = "aciDelegation"
-        service_delegation = {
-          name    = "Microsoft.ContainerInstance/containerGroups"
-          actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-        }
-      }]
-    }
-    "private_subnet2" = {
-      name              = "${local.name_prefix}-private-subnet-2"
-      address_prefixes  = [for i, cidr in var.private_subnet_cidrs : cidr if i == 1]
-      service_endpoints = ["Microsoft.KeyVault"]
-      delegation = [{
-        name = "aciDelegation"
-        service_delegation = {
-          name    = "Microsoft.ContainerInstance/containerGroups"
-          actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
-        }
-      }]
-    }
-  }
+  )
 
   tags = var.tags
 }
@@ -94,11 +80,9 @@ module "nat_gw" {
   }
 
   subnet_associations = {
-    subnet_1 = {
-      resource_id = local.private_subnet1_id
-    },
-    subnet_2 = {
-      resource_id = local.private_subnet2_id
+    for i, id in local.private_subnet_ids :
+    "subnet_${i + 1}" => {
+      resource_id = id
     }
   }
 
