@@ -10,7 +10,7 @@ module "virtual_network" {
   subnets = {
     "public_subnet1" = {
       name                            = "${local.name_prefix}-public-subnet-1"
-      address_prefixes                = var.subnet_prefixes["public_subnet1"]
+      address_prefixes                = [for i, cidr in var.public_subnet_cidrs : cidr if i == 0]
       default_outbound_access_enabled = true
       network_security_group = {
         id = module.network_sg.resource_id
@@ -18,7 +18,7 @@ module "virtual_network" {
     }
     "public_subnet2" = {
       name                            = "${local.name_prefix}-public-subnet-2"
-      address_prefixes                = var.subnet_prefixes["public_subnet2"]
+      address_prefixes                = [for i, cidr in var.public_subnet_cidrs : cidr if i == 1]
       default_outbound_access_enabled = true
       network_security_group = {
         id = module.network_sg.resource_id
@@ -26,7 +26,7 @@ module "virtual_network" {
     }
     "private_subnet1" = {
       name              = "${local.name_prefix}-private-subnet-1"
-      address_prefixes  = var.subnet_prefixes["private_subnet1"]
+      address_prefixes  = [for i, cidr in var.private_subnet_cidrs : cidr if i == 0]
       service_endpoints = ["Microsoft.KeyVault"]
       delegation = [{
         name = "aciDelegation"
@@ -38,7 +38,7 @@ module "virtual_network" {
     }
     "private_subnet2" = {
       name              = "${local.name_prefix}-private-subnet-2"
-      address_prefixes  = var.subnet_prefixes["private_subnet2"]
+      address_prefixes  = [for i, cidr in var.private_subnet_cidrs : cidr if i == 1]
       service_endpoints = ["Microsoft.KeyVault"]
       delegation = [{
         name = "aciDelegation"
