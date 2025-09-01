@@ -58,7 +58,7 @@ module "route_table" {
   subnet_resource_ids = {
     for name, subnet in module.virtual_network.subnets :
     name => subnet.resource.id
-    if can(regex("^public_", name))
+    if startswith(name, "public_")
   }
 
   tags = var.tags
