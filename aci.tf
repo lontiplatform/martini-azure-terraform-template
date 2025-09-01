@@ -24,7 +24,7 @@ resource "azurerm_container_group" "martini" {
     }
   }
 
-  subnet_ids = [local.private_subnet1_id]
+  subnet_ids = [module.virtual_network.subnets["private_subnet1"].resource.id]
 
   tags = var.tags
 }

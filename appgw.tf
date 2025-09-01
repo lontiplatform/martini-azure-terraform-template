@@ -28,7 +28,7 @@ module "app_gw" {
     }
   }
   gateway_ip_configuration = {
-    subnet_id = local.public_subnet1_id
+    subnet_id = module.virtual_network.subnets["public_subnet1"].resource.id
   }
   http_listeners = {
     appGatewayHttpListener = {

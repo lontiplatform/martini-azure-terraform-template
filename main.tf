@@ -1,12 +1,4 @@
 locals {
-  public_subnet1_id    = module.virtual_network.subnets["public_subnet1"].resource.id
-  private_subnet1_id   = module.virtual_network.subnets["private_subnet1"].resource.id
-  private_subnet2_id   = module.virtual_network.subnets["private_subnet2"].resource.id
-  public_subnet1_cidr  = module.virtual_network.subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
-  public_subnet2_cidr  = module.virtual_network.subnets["public_subnet2"].resource.body.properties.addressPrefixes[0]
-  private_subnet1_cidr = module.virtual_network.subnets["private_subnet1"].resource.body.properties.addressPrefixes[0]
-  private_subnet2_cidr = module.virtual_network.subnets["private_subnet2"].resource.body.properties.addressPrefixes[0]
-
   private_subnet_ids = [
     for k, v in module.virtual_network.subnets : v.resource.id
     if startswith(k, "private_subnet")
@@ -45,7 +37,7 @@ locals {
       protocol                   = "Tcp"
       source_address_prefix      = "*"
       source_port_range          = "*"
-      destination_address_prefix = local.public_subnet1_cidr
+      destination_address_prefix = module.virtual_network.subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
       destination_port_ranges    = ["80"]
     }
 
@@ -55,9 +47,9 @@ locals {
       direction                  = "Inbound"
       priority                   = 130
       protocol                   = "Tcp"
-      source_address_prefix      = local.public_subnet1_cidr
+      source_address_prefix      = module.virtual_network.subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
       source_port_range          = "*"
-      destination_address_prefix = local.private_subnet1_cidr
+      destination_address_prefix = module.virtual_network.subnets["private_subnet1"].resource.body.properties.addressPrefixes[0]
       destination_port_ranges    = ["${local.aci_container_port}"]
     }
 
