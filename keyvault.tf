@@ -55,3 +55,26 @@ resource "azurerm_key_vault_secret" "sql_admin_username" {
 
   tags = var.tags
 }
+
+resource "azurerm_key_vault_secret" "cassandra_primary_key" {
+  #checkov:skip=CKV_AZURE_41:Skipping secret expiration
+  count = var.enable_cassandra_tracker ? 1 : 0
+
+  name         = "cassandra-primary-key"
+  value        = azurerm_cosmosdb_account.cassandra[0].primary_key
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "secret"
+
+  tags = var.tags
+}
+
+resource "azurerm_key_vault_secret" "cassandra_contact_point" {
+  count = var.enable_cassandra_tracker ? 1 : 0
+
+  name         = "cassandra-contact-point"
+  value        = "${azurerm_cosmosdb_account.cassandra[0].name}.cassandra.cosmos.azure.com"
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "text/plain"
+
+  tags = var.tags
+}

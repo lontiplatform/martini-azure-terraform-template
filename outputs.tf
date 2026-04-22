@@ -20,3 +20,20 @@ output "subnet_prefixes" {
     name => subnet.resource.body.properties.addressPrefixes[0]
   }
 }
+
+// Cassandra (Cosmos DB API) tracker endpoint. Populated only when enable_cassandra_tracker is true.
+output "cassandra_contact_point" {
+  value = var.enable_cassandra_tracker ? "${azurerm_cosmosdb_account.cassandra[0].name}.cassandra.cosmos.azure.com" : null
+}
+
+output "cassandra_port" {
+  value = var.enable_cassandra_tracker ? 10350 : null
+}
+
+output "cassandra_keyspace_name" {
+  value = var.enable_cassandra_tracker ? azurerm_cosmosdb_cassandra_keyspace.tracker[0].name : null
+}
+
+output "cassandra_account_name" {
+  value = var.enable_cassandra_tracker ? azurerm_cosmosdb_account.cassandra[0].name : null
+}

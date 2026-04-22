@@ -1,5 +1,6 @@
 # Local .terraform directories
 **/.terraform/*
+.external_modules
 
 # .tfstate files
 *.tfstate
@@ -33,3 +34,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 .venv/
+
+# IDEs
+.idea

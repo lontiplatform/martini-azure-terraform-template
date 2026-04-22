@@ -10,7 +10,7 @@ module "app_gw" {
   backend_address_pools = {
     appGatewayBackendPool = {
       name         = "appGatewayBackendPool"
-      ip_addresses = [azurerm_container_group.martini.ip_address]
+      ip_addresses = azurerm_container_group.martini[*].ip_address
     }
   }
   backend_http_settings = {

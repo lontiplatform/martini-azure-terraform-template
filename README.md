@@ -39,13 +39,15 @@ run a few checks before the commit. The checks used are (in order of execution):
 | Name | Version |
 |------|---------|
 | <a name="requirement_azurerm"></a> [azurerm](#requirement\_azurerm) | ~> 4.37.0 |
+| <a name="requirement_local"></a> [local](#requirement\_local) | ~> 2.5 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
 | <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.37.0 |
-| <a name="provider_random"></a> [random](#provider\_random) | 3.7.2 |
+| <a name="provider_local"></a> [local](#provider\_local) | 2.8.0 |
+| <a name="provider_random"></a> [random](#provider\_random) | 3.8.1 |
 
 ## Modules
 
@@ -63,26 +65,44 @@ run a few checks before the commit. The checks used are (in order of execution):
 | Name | Type |
 |------|------|
 | [azurerm_container_group.martini](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_group) | resource |
+| [azurerm_cosmosdb_account.cassandra](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/cosmosdb_account) | resource |
+| [azurerm_cosmosdb_cassandra_keyspace.tracker](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/cosmosdb_cassandra_keyspace) | resource |
 | [azurerm_key_vault.key_vault](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault) | resource |
+| [azurerm_key_vault_secret.cassandra_contact_point](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [azurerm_key_vault_secret.cassandra_primary_key](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.martini_workspace_license](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.sql_admin_password](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.sql_admin_username](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_public_ip.app_gw_pip](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/public_ip) | resource |
 | [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
+| [azurerm_storage_account.conf](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account) | resource |
+| [azurerm_storage_share.conf_db_pool](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_share) | resource |
+| [azurerm_storage_share_file.tracker_dbxml](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_share_file) | resource |
+| [local_file.tracker_dbxml](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [random_password.admin_password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
+| [random_string.storage_suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
+| [azurerm_public_ip.nat_gw](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/public_ip) | data source |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_aci_docker_image_url"></a> [aci\_docker\_image\_url](#input\_aci\_docker\_image\_url) | A URL to the Docker image used by the application | `string` | `"lontiplatform/martini-server-runtime:latest"` | no |
+| <a name="input_aci_docker_image_url"></a> [aci\_docker\_image\_url](#input\_aci\_docker\_image\_url) | Docker image repository for the application (without tag). The tag is set via `martini_runtime_version`. | `string` | `"lontiplatform/martini-server-runtime"` | no |
+| <a name="input_cassandra_keyspace_name"></a> [cassandra\_keyspace\_name](#input\_cassandra\_keyspace\_name) | Name of the Cassandra keyspace used by the Martini tracker. Valid only if `enable_cassandra_tracker` is set to `true`. | `string` | `"tracker"` | no |
+| <a name="input_cassandra_throughput"></a> [cassandra\_throughput](#input\_cassandra\_throughput) | Throughput (RU/s) for the Cassandra keyspace. Must be >= 400, increments of 100. Valid only if `enable_cassandra_tracker` is set to `true`. | `number` | `400` | no |
 | <a name="input_cpu"></a> [cpu](#input\_cpu) | Number of CPU cores to allocate for the application. | `number` | `2` | no |
+| <a name="input_docker_registry_password"></a> [docker\_registry\_password](#input\_docker\_registry\_password) | Docker Hub access token (preferred) or password paired with `docker_registry_username`. | `string` | `""` | no |
+| <a name="input_docker_registry_username"></a> [docker\_registry\_username](#input\_docker\_registry\_username) | Docker Hub username used to authenticate image pulls and avoid anonymous rate limits. Leave empty to pull anonymously. | `string` | `""` | no |
+| <a name="input_enable_cassandra_tracker"></a> [enable\_cassandra\_tracker](#input\_enable\_cassandra\_tracker) | Should Martini use Cosmos DB for Apache Cassandra as the tracker backend? | `bool` | `false` | no |
 | <a name="input_enable_sql_server"></a> [enable\_sql\_server](#input\_enable\_sql\_server) | Should Martini use SQL Server database? | `bool` | `false` | no |
+| <a name="input_martini_home_path"></a> [martini\_home\_path](#input\_martini\_home\_path) | Path to the Martini workspace inside the container image. Default matches the official lontiplatform/martini-server-runtime image. | `string` | `"/data"` | no |
+| <a name="input_martini_runtime_version"></a> [martini\_runtime\_version](#input\_martini\_runtime\_version) | Tag of the Martini runtime Docker image to deploy. | `string` | `"2.7.2"` | no |
 | <a name="input_martini_workspace_license"></a> [martini\_workspace\_license](#input\_martini\_workspace\_license) | Full license text to be used with Martini | `string` | n/a | yes |
 | <a name="input_max_size_gb"></a> [max\_size\_gb](#input\_max\_size\_gb) | The max size of the database in gigabytes. | `number` | `50` | no |
 | <a name="input_memory"></a> [memory](#input\_memory) | Amount of memory (in GB) to allocate for the application | `number` | `4` | no |
 | <a name="input_name_suffix"></a> [name\_suffix](#input\_name\_suffix) | Suffix to add to the resources' names | `string` | `""` | no |
+| <a name="input_node_count"></a> [node\_count](#input\_node\_count) | Number of Martini container instances to run behind the Application Gateway | `number` | `1` | no |
 | <a name="input_private_subnet_cidrs"></a> [private\_subnet\_cidrs](#input\_private\_subnet\_cidrs) | A list of prefixes for public subnets. | `list(string)` | <pre>[<br/>  "10.0.11.0/24",<br/>  "10.0.12.0/24"<br/>]</pre> | no |
 | <a name="input_public_subnet_cidrs"></a> [public\_subnet\_cidrs](#input\_public\_subnet\_cidrs) | A list of prefixes for public subnets. | `list(string)` | <pre>[<br/>  "10.0.1.0/24",<br/>  "10.0.2.0/24"<br/>]</pre> | no |
 | <a name="input_rg_location"></a> [rg\_location](#input\_rg\_location) | Azure region to deploy resources into | `string` | n/a | yes |
@@ -97,6 +117,10 @@ run a few checks before the commit. The checks used are (in order of execution):
 | Name | Description |
 |------|-------------|
 | <a name="output_app_gw_url"></a> [app\_gw\_url](#output\_app\_gw\_url) | Application Gateway's URL |
+| <a name="output_cassandra_account_name"></a> [cassandra\_account\_name](#output\_cassandra\_account\_name) | n/a |
+| <a name="output_cassandra_contact_point"></a> [cassandra\_contact\_point](#output\_cassandra\_contact\_point) | Cassandra (Cosmos DB API) tracker endpoint. Populated only when enable\_cassandra\_tracker is true. |
+| <a name="output_cassandra_keyspace_name"></a> [cassandra\_keyspace\_name](#output\_cassandra\_keyspace\_name) | n/a |
+| <a name="output_cassandra_port"></a> [cassandra\_port](#output\_cassandra\_port) | n/a |
 | <a name="output_resource_group_location"></a> [resource\_group\_location](#output\_resource\_group\_location) | The Azure region where the Martini resources are deployed. |
 | <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | Name of the resource group created for the application |
 | <a name="output_subnet_prefixes"></a> [subnet\_prefixes](#output\_subnet\_prefixes) | CIDRs |

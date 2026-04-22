@@ -17,6 +17,9 @@ module "virtual_network" {
         network_security_group = {
           id = module.network_sg.resource_id
         }
+        route_table = {
+          id = module.route_table.resource_id
+        }
       }
     },
     {
@@ -32,6 +35,9 @@ module "virtual_network" {
             actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
           }
         }]
+        nat_gateway = {
+          id = module.nat_gw.resource_id
+        }
       }
     }
   )
@@ -55,12 +61,6 @@ module "route_table" {
     }
   }
 
-  subnet_resource_ids = {
-    for name, subnet in module.virtual_network.subnets :
-    name => subnet.resource.id
-    if startswith(name, "public_")
-  }
-
   tags = var.tags
 }
 
@@ -76,13 +76,6 @@ module "nat_gw" {
   public_ips = {
     public_ip_1 = {
       name = "${local.name_prefix}-nat-gw-public-ip"
-    }
-  }
-
-  subnet_associations = {
-    for i, id in local.private_subnet_ids :
-    "subnet_${i + 1}" => {
-      resource_id = id
     }
   }
 
