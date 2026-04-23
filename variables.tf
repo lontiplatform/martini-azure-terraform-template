@@ -137,11 +137,11 @@ variable "cassandra_subnet_cidr" {
 variable "cassandra_version" {
   description = "Apache Cassandra major version for the Managed Instance cluster. Valid only if `enable_cassandra_tracker` is set to `true`."
   type        = string
-  default     = "4"
+  default     = "4.0"
 
   validation {
-    condition     = contains(["3.11", "4"], var.cassandra_version)
-    error_message = "cassandra_version must be one of: 3.11, 4."
+    condition     = contains(["3.11", "4.0"], var.cassandra_version)
+    error_message = "cassandra_version must be one of: 3.11, 4.0."
   }
 }
 
