@@ -3,6 +3,11 @@
 The repository contains a Terraform template to create a complete infrastructure running Martini Runtime in the cloud 
 on Azure ACI along with optional dependency such as an SQL database.
 
+# Breaking change: Cassandra backend switched to Managed Instance
+
+`enable_cassandra_tracker = true` now provisions an **Azure Managed Instance for Apache Cassandra** cluster, not Cosmos DB with the Cassandra API. The two are different Azure resource types with no `moved {}` migration path — a `terraform apply` over a previous Cosmos-based deployment will **destroy** the Cosmos account and its keyspace data and **create** a new MI cluster in their place. Any data in the old keyspace is lost.
+
+MI cluster provisioning takes approximately 20–40 minutes. The minimum cluster is 3 nodes × `Standard_E2s_v5` + 4 × P30 disks per node — significantly more expensive than the Cosmos 400 RU/s minimum. Adjust `cassandra_sku`, `cassandra_node_count`, `cassandra_disk_count`, `cassandra_disk_sku` for your workload.
 
 # Requirements
 
