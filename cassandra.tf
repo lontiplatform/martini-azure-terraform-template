@@ -23,6 +23,17 @@ resource "azurerm_role_assignment" "cassandra_cosmos_db_subnet_join" {
   principal_id         = data.azuread_service_principal.cosmos_db[0].object_id
 }
 
+# Azure RBAC has eventual-consistency propagation delays; the Cosmos DB
+# control plane may not see the role assignment for 1-2 minutes after it's
+# created. Without this buffer, cluster-create polls fail with BadRequest
+# even though the assignment already exists.
+resource "time_sleep" "wait_for_role_propagation" {
+  count = var.enable_cassandra_tracker ? 1 : 0
+
+  depends_on      = [azurerm_role_assignment.cassandra_cosmos_db_subnet_join]
+  create_duration = "180s"
+}
+
 resource "azurerm_cosmosdb_cassandra_cluster" "tracker" {
   count = var.enable_cassandra_tracker ? 1 : 0
 
@@ -34,7 +45,7 @@ resource "azurerm_cosmosdb_cassandra_cluster" "tracker" {
   authentication_method          = "Cassandra"
   version                        = var.cassandra_version
 
-  depends_on = [azurerm_role_assignment.cassandra_cosmos_db_subnet_join]
+  depends_on = [time_sleep.wait_for_role_propagation]
 
   tags = merge(
     var.tags, {
