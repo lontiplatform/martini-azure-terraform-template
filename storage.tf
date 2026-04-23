@@ -31,15 +31,6 @@ resource "azurerm_storage_account" "conf" {
 
   public_network_access_enabled = true
 
-  network_rules {
-    # ip_rules is unused while default_action = "Allow"; it documents the
-    # production allow-list (NAT GW egress). Flip default_action to "Deny"
-    # for production.
-    default_action = "Allow"
-    ip_rules       = [data.azurerm_public_ip.nat_gw[0].ip_address]
-    bypass         = ["AzureServices"]
-  }
-
   tags = var.tags
 }
 

@@ -70,10 +70,10 @@ locals {
   aci_container_port = 8080
 
   tracker_dbxml_rendered = var.enable_cassandra_tracker ? templatefile("${path.module}/templates/tracker.dbxml.tftpl", {
-    contact_point = "${azurerm_cosmosdb_account.cassandra[0].name}.cassandra.cosmos.azure.com"
-    port          = 10350
-    username      = azurerm_cosmosdb_account.cassandra[0].name
-    password      = azurerm_cosmosdb_account.cassandra[0].primary_key
-    ssl           = "true"
+    contact_point = azurerm_cosmosdb_cassandra_datacenter.tracker[0].seed_node_ip_addresses[0]
+    port          = 9042
+    username      = "cassandra"
+    password      = random_password.cassandra_admin[0].result
+    ssl           = "false"
   }) : ""
 }

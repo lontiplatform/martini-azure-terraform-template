@@ -25,7 +25,7 @@ resource "azurerm_container_group" "martini" {
 
     environment_variables = var.enable_cassandra_tracker ? {
       MR_TRACKER_ENABLE_EMBEDDED_DATABASE = "false"
-      MR_TRACKER_DATABASE_NAME            = var.cassandra_keyspace_name
+      MR_TRACKER_DATABASE_NAME            = "tracker"
     } : {}
 
     secure_environment_variables = {

@@ -18,17 +18,13 @@ output "subnet_prefixes" {
 }
 
 output "cassandra_contact_point" {
-  value = var.enable_cassandra_tracker ? "${azurerm_cosmosdb_account.cassandra[0].name}.cassandra.cosmos.azure.com" : null
+  value = var.enable_cassandra_tracker ? azurerm_cosmosdb_cassandra_datacenter.tracker[0].seed_node_ip_addresses[0] : null
 }
 
 output "cassandra_port" {
-  value = var.enable_cassandra_tracker ? 10350 : null
+  value = var.enable_cassandra_tracker ? 9042 : null
 }
 
-output "cassandra_keyspace_name" {
-  value = var.enable_cassandra_tracker ? azurerm_cosmosdb_cassandra_keyspace.tracker[0].name : null
-}
-
-output "cassandra_account_name" {
-  value = var.enable_cassandra_tracker ? azurerm_cosmosdb_account.cassandra[0].name : null
+output "cassandra_cluster_name" {
+  value = var.enable_cassandra_tracker ? azurerm_cosmosdb_cassandra_cluster.tracker[0].name : null
 }
