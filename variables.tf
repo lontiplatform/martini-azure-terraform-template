@@ -135,6 +135,77 @@ variable "cassandra_throughput" {
   }
 }
 
+variable "cassandra_subnet_cidr" {
+  description = "CIDR for the delegated subnet hosting Azure Managed Instance for Apache Cassandra. Must be /26 or larger. Valid only if `enable_cassandra_tracker` is set to `true`."
+  type        = string
+  default     = "10.0.20.0/26"
+
+  validation {
+    condition     = can(cidrhost(var.cassandra_subnet_cidr, 0))
+    error_message = "cassandra_subnet_cidr must be a valid CIDR block."
+  }
+
+  validation {
+    condition     = tonumber(regex("/(\\d+)$", var.cassandra_subnet_cidr)[0]) <= 26
+    error_message = "cassandra_subnet_cidr prefix length must be /26 or larger (prefix number <= 26)."
+  }
+}
+
+variable "cassandra_version" {
+  description = "Apache Cassandra major version for the Managed Instance cluster. Valid only if `enable_cassandra_tracker` is set to `true`."
+  type        = string
+  default     = "4"
+
+  validation {
+    condition     = contains(["3.11", "4"], var.cassandra_version)
+    error_message = "cassandra_version must be one of: 3.11, 4."
+  }
+}
+
+variable "cassandra_node_count" {
+  description = "Number of Cassandra nodes per data center. Azure Managed Instance for Apache Cassandra requires at least 3. Valid only if `enable_cassandra_tracker` is set to `true`."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = var.cassandra_node_count >= 3
+    error_message = "cassandra_node_count must be at least 3 (Azure Managed Instance minimum)."
+  }
+}
+
+variable "cassandra_sku" {
+  description = "VM SKU for each Cassandra node. Default `Standard_E2s_v5` is the cheapest Managed-Instance-supported SKU for dev/demo; use `Standard_E8s_v5` or larger for production. Valid only if `enable_cassandra_tracker` is set to `true`."
+  type        = string
+  default     = "Standard_E2s_v5"
+
+  validation {
+    condition     = trimspace(var.cassandra_sku) != ""
+    error_message = "cassandra_sku must not be empty."
+  }
+}
+
+variable "cassandra_disk_count" {
+  description = "Number of premium managed disks attached to each Cassandra node. Valid only if `enable_cassandra_tracker` is set to `true`."
+  type        = number
+  default     = 4
+
+  validation {
+    condition     = var.cassandra_disk_count >= 1
+    error_message = "cassandra_disk_count must be at least 1."
+  }
+}
+
+variable "cassandra_disk_sku" {
+  description = "Premium disk SKU for each Cassandra node disk (e.g. `P30`, `P40`). Valid only if `enable_cassandra_tracker` is set to `true`."
+  type        = string
+  default     = "P30"
+
+  validation {
+    condition     = trimspace(var.cassandra_disk_sku) != ""
+    error_message = "cassandra_disk_sku must not be empty."
+  }
+}
+
 variable "martini_home_path" {
   description = "Path to the Martini workspace inside the container image. Default matches the official lontiplatform/martini-server-runtime image."
   type        = string
