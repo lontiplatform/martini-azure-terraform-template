@@ -116,12 +116,12 @@ run a few checks before the commit. The checks used are (in order of execution):
 
 | Name | Description |
 |------|-------------|
-| <a name="output_app_gw_url"></a> [app\_gw\_url](#output\_app\_gw\_url) | Application Gateway's URL |
+| <a name="output_app_gw_url"></a> [app\_gw\_url](#output\_app\_gw\_url) | n/a |
 | <a name="output_cassandra_account_name"></a> [cassandra\_account\_name](#output\_cassandra\_account\_name) | n/a |
-| <a name="output_cassandra_contact_point"></a> [cassandra\_contact\_point](#output\_cassandra\_contact\_point) | Cassandra (Cosmos DB API) tracker endpoint. Populated only when enable\_cassandra\_tracker is true. |
+| <a name="output_cassandra_contact_point"></a> [cassandra\_contact\_point](#output\_cassandra\_contact\_point) | n/a |
 | <a name="output_cassandra_keyspace_name"></a> [cassandra\_keyspace\_name](#output\_cassandra\_keyspace\_name) | n/a |
 | <a name="output_cassandra_port"></a> [cassandra\_port](#output\_cassandra\_port) | n/a |
-| <a name="output_resource_group_location"></a> [resource\_group\_location](#output\_resource\_group\_location) | The Azure region where the Martini resources are deployed. |
-| <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | Name of the resource group created for the application |
-| <a name="output_subnet_prefixes"></a> [subnet\_prefixes](#output\_subnet\_prefixes) | CIDRs |
+| <a name="output_resource_group_location"></a> [resource\_group\_location](#output\_resource\_group\_location) | n/a |
+| <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | n/a |
+| <a name="output_subnet_prefixes"></a> [subnet\_prefixes](#output\_subnet\_prefixes) | n/a |
 <!-- END_TF_DOCS -->

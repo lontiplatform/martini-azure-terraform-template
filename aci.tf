@@ -1,5 +1,6 @@
 resource "azurerm_container_group" "martini" {
   #checkov:skip=CKV2_AZURE_28:Managed Service Identity currently does not support container groups deployed in virtual networks.
+  #checkov:skip=CKV_AZURE_235:Plaintext env vars carry non-secret tracker configuration; secrets use secure_environment_variables.
   count = var.node_count
 
   name                = "${local.name_prefix}-aci-${count.index + 1}"

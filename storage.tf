@@ -17,6 +17,7 @@ resource "azurerm_storage_account" "conf" {
   #checkov:skip=CKV2_AZURE_38:Soft-delete defaults are sufficient for this template
   #checkov:skip=CKV2_AZURE_40:Shared access keys required for ACI Azure Files volume mount
   #checkov:skip=CKV2_AZURE_41:SAS tokens not used; access is via account key from ACI
+  #checkov:skip=CKV2_AZURE_47:Account hosts only the Azure Files share mounted by ACI; no blobs are created so anonymous blob access is inapplicable.
   count = var.enable_cassandra_tracker ? 1 : 0
 
   name                = substr("${replace(local.name_prefix, "-", "")}conf${random_string.storage_suffix[0].result}", 0, 24)
@@ -31,10 +32,9 @@ resource "azurerm_storage_account" "conf" {
   public_network_access_enabled = true
 
   network_rules {
-    # Demo posture: public access is allowed so Terraform can upload the seed
-    # tracker.dbxml from any developer's machine. ACI egresses through the NAT
-    # GW, so ip_rules documents the production allow-list. For production, flip
-    # default_action to "Deny".
+    # ip_rules is unused while default_action = "Allow"; it documents the
+    # production allow-list (NAT GW egress). Flip default_action to "Deny"
+    # for production.
     default_action = "Allow"
     ip_rules       = [data.azurerm_public_ip.nat_gw[0].ip_address]
     bypass         = ["AzureServices"]
