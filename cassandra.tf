@@ -6,6 +6,23 @@ resource "random_password" "cassandra_admin" {
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
+# The Azure Cosmos DB first-party service principal needs permission to join
+# the delegated subnet before the cluster can be created. Documented at
+# https://aka.ms/ManagedCassandraVNetPermissions.
+data "azuread_service_principal" "cosmos_db" {
+  count = var.enable_cassandra_tracker ? 1 : 0
+
+  client_id = "a232010e-820c-4083-83bb-3ace5fc29d0b"
+}
+
+resource "azurerm_role_assignment" "cassandra_cosmos_db_subnet_join" {
+  count = var.enable_cassandra_tracker ? 1 : 0
+
+  scope                = module.virtual_network.subnets["cassandra_subnet"].resource.id
+  role_definition_name = "Network Contributor"
+  principal_id         = data.azuread_service_principal.cosmos_db[0].object_id
+}
+
 resource "azurerm_cosmosdb_cassandra_cluster" "tracker" {
   count = var.enable_cassandra_tracker ? 1 : 0
 
@@ -16,6 +33,8 @@ resource "azurerm_cosmosdb_cassandra_cluster" "tracker" {
   default_admin_password         = random_password.cassandra_admin[0].result
   authentication_method          = "Cassandra"
   version                        = var.cassandra_version
+
+  depends_on = [azurerm_role_assignment.cassandra_cosmos_db_subnet_join]
 
   tags = merge(
     var.tags, {
