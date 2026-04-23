@@ -50,7 +50,7 @@ locals {
       source_address_prefix        = module.virtual_network.subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
       source_port_range            = "*"
       destination_address_prefixes = var.private_subnet_cidrs
-      destination_port_ranges      = [local.aci_container_port]
+      destination_port_ranges      = [tostring(local.aci_container_port)]
     }
   }
 
@@ -69,7 +69,6 @@ locals {
   aci_service_name   = "${local.name_prefix}-service"
   aci_container_port = 8080
 
-  # Mounted by aci.tf as a secret at /data/conf/db-pool/tracker.dbxml.
   tracker_dbxml_rendered = var.enable_cassandra_tracker ? templatefile("${path.module}/templates/tracker.dbxml.tftpl", {
     contact_point = "${azurerm_cosmosdb_account.cassandra[0].name}.cassandra.cosmos.azure.com"
     port          = 10350

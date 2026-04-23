@@ -18,7 +18,7 @@ module "app_gw" {
       name                  = "appGatewayBackendHttpSettings"
       port                  = local.aci_container_port
       protocol              = "Http"
-      cookie_based_affinity = "Disabled"
+      cookie_based_affinity = "Enabled"
     }
   }
   frontend_ports = {

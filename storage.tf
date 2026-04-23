@@ -9,7 +9,7 @@ resource "random_string" "storage_suffix" {
 
 resource "azurerm_storage_account" "conf" {
   #checkov:skip=CKV_AZURE_33:Storage logging not required for this template
-  #checkov:skip=CKV_AZURE_59:Access restricted via NAT GW IP allow-list
+  #checkov:skip=CKV_AZURE_59:Demo template: public access is intentional so Terraform can upload the seed tracker.dbxml from any developer/CI machine. Switch to Deny + allow-list for production.
   #checkov:skip=CKV_AZURE_206:LRS is sufficient for this template
   #checkov:skip=CKV2_AZURE_1:Encryption keys managed by Microsoft is sufficient for this template
   #checkov:skip=CKV2_AZURE_18:Customer-managed keys not required for this template
@@ -31,12 +31,13 @@ resource "azurerm_storage_account" "conf" {
   public_network_access_enabled = true
 
   network_rules {
+    # Demo posture: public access is allowed so Terraform can upload the seed
+    # tracker.dbxml from any developer's machine. ACI egresses through the NAT
+    # GW, so ip_rules documents the production allow-list. For production, flip
+    # default_action to "Deny".
     default_action = "Allow"
-    # ACI mounts Azure Files via the storage account's public endpoint; ACI
-    # egress goes through the NAT GW, so only its IP needs to be allow-listed.
-    # AzureServices bypass lets the Terraform client upload the seed file.
-    ip_rules = [data.azurerm_public_ip.nat_gw[0].ip_address]
-    bypass   = ["AzureServices"]
+    ip_rules       = [data.azurerm_public_ip.nat_gw[0].ip_address]
+    bypass         = ["AzureServices"]
   }
 
   tags = var.tags
@@ -61,7 +62,9 @@ resource "local_file" "tracker_dbxml" {
 resource "azurerm_storage_share_file" "tracker_dbxml" {
   count = var.enable_cassandra_tracker ? 1 : 0
 
-  name             = "tracker.dbxml"
+  name = "tracker.dbxml"
+  # Use .url (not .id) to work around azurerm bug where storage_share_file fails
+  # to parse the ARM-style share ID. https://github.com/hashicorp/terraform-provider-azurerm/issues/28032
   storage_share_id = azurerm_storage_share.conf_db_pool[0].url
   source           = local_file.tracker_dbxml[0].filename
   content_md5      = md5(local.tracker_dbxml_rendered)

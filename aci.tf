@@ -58,7 +58,7 @@ resource "azurerm_container_group" "martini" {
     }
   }
 
-  subnet_ids = [local.private_subnet_ids[count.index]]
+  subnet_ids = [local.private_subnet_ids[count.index % length(local.private_subnet_ids)]]
 
   tags = var.tags
 }

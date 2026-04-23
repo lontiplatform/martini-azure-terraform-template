@@ -50,6 +50,11 @@ variable "docker_registry_password" {
   type        = string
   default     = ""
   sensitive   = true
+
+  validation {
+    condition     = (trimspace(var.docker_registry_username) == "") == (trimspace(var.docker_registry_password) == "")
+    error_message = "docker_registry_username and docker_registry_password must either both be set or both be empty."
+  }
 }
 
 variable "cpu" {
@@ -123,6 +128,11 @@ variable "cassandra_throughput" {
   description = "Throughput (RU/s) for the Cassandra keyspace. Must be >= 400, increments of 100. Valid only if `enable_cassandra_tracker` is set to `true`."
   type        = number
   default     = 400
+
+  validation {
+    condition     = var.cassandra_throughput >= 400 && var.cassandra_throughput % 100 == 0
+    error_message = "cassandra_throughput must be at least 400 RU/s and specified in increments of 100."
+  }
 }
 
 variable "martini_home_path" {
