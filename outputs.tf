@@ -28,3 +28,19 @@ output "cassandra_port" {
 output "cassandra_cluster_name" {
   value = var.enable_cassandra_tracker ? azurerm_cosmosdb_cassandra_cluster.tracker[0].name : null
 }
+
+output "service_bus_endpoint" {
+  value = var.enable_service_bus ? azurerm_servicebus_namespace.this[0].endpoint : null
+}
+
+output "service_bus_namespace_name" {
+  value = var.enable_service_bus ? azurerm_servicebus_namespace.this[0].name : null
+}
+
+output "service_bus_queue_names" {
+  value = var.enable_service_bus ? [for q in azurerm_servicebus_queue.queues : q.name] : []
+}
+
+output "service_bus_topic_names" {
+  value = var.enable_service_bus ? [for t in azurerm_servicebus_topic.topics : t.name] : []
+}

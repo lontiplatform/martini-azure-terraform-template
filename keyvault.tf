@@ -78,3 +78,38 @@ resource "azurerm_key_vault_secret" "cassandra_contact_point" {
 
   tags = var.tags
 }
+
+resource "azurerm_key_vault_secret" "service_bus_ces_send_connection_string" {
+  #checkov:skip=CKV_AZURE_41:Skipping secret expiration
+  count = var.enable_service_bus ? 1 : 0
+
+  name         = "service-bus-ces-send-connection-string"
+  value        = azurerm_servicebus_namespace_authorization_rule.ces_send[0].primary_connection_string
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "secret"
+
+  tags = var.tags
+}
+
+resource "azurerm_key_vault_secret" "service_bus_martini_listen_connection_string" {
+  #checkov:skip=CKV_AZURE_41:Skipping secret expiration
+  count = var.enable_service_bus ? 1 : 0
+
+  name         = "service-bus-martini-listen-connection-string"
+  value        = azurerm_servicebus_namespace_authorization_rule.martini_listen[0].primary_connection_string
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "secret"
+
+  tags = var.tags
+}
+
+resource "azurerm_key_vault_secret" "service_bus_endpoint" {
+  count = var.enable_service_bus ? 1 : 0
+
+  name         = "service-bus-endpoint"
+  value        = azurerm_servicebus_namespace.this[0].endpoint
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "text/plain"
+
+  tags = var.tags
+}

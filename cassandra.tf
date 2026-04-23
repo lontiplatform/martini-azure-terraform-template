@@ -47,6 +47,15 @@ resource "azurerm_cosmosdb_cassandra_cluster" "tracker" {
 
   depends_on = [time_sleep.wait_for_role_propagation]
 
+  # Azure never returns default_admin_password on reads, so after import it
+  # appears as null in state and every subsequent plan wants to replace the
+  # cluster. The field is also ForceNew in the provider, which would destroy
+  # all keyspace data. Ignore it — password rotation has to be done out of
+  # band (Azure portal / az CLI + a manual state-refresh of random_password).
+  lifecycle {
+    ignore_changes = [default_admin_password]
+  }
+
   tags = merge(
     var.tags, {
       "Service" = "Cassandra"

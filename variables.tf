@@ -195,6 +195,63 @@ variable "martini_home_path" {
   default     = "/data"
 }
 
+// Service Bus configuration
+variable "enable_service_bus" {
+  description = "Should an Azure Service Bus namespace be provisioned for inbound messaging (e.g. Azure SQL CES -> Martini)?"
+  type        = bool
+  default     = false
+}
+
+variable "service_bus_sku" {
+  description = "SKU tier for the Service Bus namespace. Basic does not support topics. Valid only if `enable_service_bus` is set to `true`."
+  type        = string
+  default     = "Standard"
+
+  validation {
+    condition     = contains(["Basic", "Standard", "Premium"], var.service_bus_sku)
+    error_message = "service_bus_sku must be one of: Basic, Standard, Premium."
+  }
+}
+
+variable "service_bus_capacity" {
+  description = "Messaging units for the Premium SKU. Ignored for Basic/Standard. Valid only if `enable_service_bus` is set to `true`."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = contains([1, 2, 4, 8, 16], var.service_bus_capacity)
+    error_message = "service_bus_capacity must be one of: 1, 2, 4, 8, 16."
+  }
+}
+
+variable "service_bus_premium_messaging_partitions" {
+  description = "Messaging partitions for the Premium SKU. Ignored for Basic/Standard. Valid only if `enable_service_bus` is set to `true`."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = contains([1, 2, 4], var.service_bus_premium_messaging_partitions)
+    error_message = "service_bus_premium_messaging_partitions must be one of: 1, 2, 4."
+  }
+}
+
+variable "service_bus_queues" {
+  description = "Queue names to create on the namespace. Valid only if `enable_service_bus` is set to `true`."
+  type        = list(string)
+  default     = []
+}
+
+variable "service_bus_topics" {
+  description = "Topic names to create on the namespace. Each topic gets a single subscription named `martini`. Requires `service_bus_sku` of `Standard` or `Premium`. Valid only if `enable_service_bus` is set to `true`."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition     = length(var.service_bus_topics) == 0 || var.service_bus_sku != "Basic"
+    error_message = "service_bus_topics requires service_bus_sku = Standard or Premium (Basic does not support topics)."
+  }
+}
+
 // Virtual Network configuration
 variable "vnet_address_space" {
   description = "Virtual Network CIDR"

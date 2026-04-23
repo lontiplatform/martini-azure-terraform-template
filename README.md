@@ -80,11 +80,20 @@ run a few checks before the commit. The checks used are (in order of execution):
 | [azurerm_key_vault_secret.cassandra_admin_password](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.cassandra_contact_point](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.martini_workspace_license](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [azurerm_key_vault_secret.service_bus_ces_send_connection_string](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [azurerm_key_vault_secret.service_bus_endpoint](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
+| [azurerm_key_vault_secret.service_bus_martini_listen_connection_string](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.sql_admin_password](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.sql_admin_username](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_public_ip.app_gw_pip](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/public_ip) | resource |
 | [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
 | [azurerm_role_assignment.cassandra_cosmos_db_subnet_join](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
+| [azurerm_servicebus_namespace.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/servicebus_namespace) | resource |
+| [azurerm_servicebus_namespace_authorization_rule.ces_send](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/servicebus_namespace_authorization_rule) | resource |
+| [azurerm_servicebus_namespace_authorization_rule.martini_listen](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/servicebus_namespace_authorization_rule) | resource |
+| [azurerm_servicebus_queue.queues](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/servicebus_queue) | resource |
+| [azurerm_servicebus_subscription.martini_subs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/servicebus_subscription) | resource |
+| [azurerm_servicebus_topic.topics](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/servicebus_topic) | resource |
 | [azurerm_storage_account.conf](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account) | resource |
 | [azurerm_storage_share.conf_db_pool](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_share) | resource |
 | [azurerm_storage_share_file.tracker_dbxml](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_share_file) | resource |
@@ -111,6 +120,7 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="input_docker_registry_password"></a> [docker\_registry\_password](#input\_docker\_registry\_password) | Docker Hub access token (preferred) or password paired with `docker_registry_username`. | `string` | `""` | no |
 | <a name="input_docker_registry_username"></a> [docker\_registry\_username](#input\_docker\_registry\_username) | Docker Hub username used to authenticate image pulls and avoid anonymous rate limits. Leave empty to pull anonymously. | `string` | `""` | no |
 | <a name="input_enable_cassandra_tracker"></a> [enable\_cassandra\_tracker](#input\_enable\_cassandra\_tracker) | Should Martini use Azure Managed Instance for Apache Cassandra as the tracker backend? | `bool` | `false` | no |
+| <a name="input_enable_service_bus"></a> [enable\_service\_bus](#input\_enable\_service\_bus) | Should an Azure Service Bus namespace be provisioned for inbound messaging (e.g. Azure SQL CES -> Martini)? | `bool` | `false` | no |
 | <a name="input_enable_sql_server"></a> [enable\_sql\_server](#input\_enable\_sql\_server) | Should Martini use SQL Server database? | `bool` | `false` | no |
 | <a name="input_martini_home_path"></a> [martini\_home\_path](#input\_martini\_home\_path) | Path to the Martini workspace inside the container image. Default matches the official lontiplatform/martini-server-runtime image. | `string` | `"/data"` | no |
 | <a name="input_martini_runtime_version"></a> [martini\_runtime\_version](#input\_martini\_runtime\_version) | Tag of the Martini runtime Docker image to deploy. | `string` | `"2.7.2"` | no |
@@ -122,6 +132,11 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="input_private_subnet_cidrs"></a> [private\_subnet\_cidrs](#input\_private\_subnet\_cidrs) | A list of prefixes for public subnets. | `list(string)` | <pre>[<br/>  "10.0.11.0/24",<br/>  "10.0.12.0/24"<br/>]</pre> | no |
 | <a name="input_public_subnet_cidrs"></a> [public\_subnet\_cidrs](#input\_public\_subnet\_cidrs) | A list of prefixes for public subnets. | `list(string)` | <pre>[<br/>  "10.0.1.0/24",<br/>  "10.0.2.0/24"<br/>]</pre> | no |
 | <a name="input_rg_location"></a> [rg\_location](#input\_rg\_location) | Azure region to deploy resources into | `string` | n/a | yes |
+| <a name="input_service_bus_capacity"></a> [service\_bus\_capacity](#input\_service\_bus\_capacity) | Messaging units for the Premium SKU. Ignored for Basic/Standard. Valid only if `enable_service_bus` is set to `true`. | `number` | `1` | no |
+| <a name="input_service_bus_premium_messaging_partitions"></a> [service\_bus\_premium\_messaging\_partitions](#input\_service\_bus\_premium\_messaging\_partitions) | Messaging partitions for the Premium SKU. Ignored for Basic/Standard. Valid only if `enable_service_bus` is set to `true`. | `number` | `1` | no |
+| <a name="input_service_bus_queues"></a> [service\_bus\_queues](#input\_service\_bus\_queues) | Queue names to create on the namespace. Valid only if `enable_service_bus` is set to `true`. | `list(string)` | `[]` | no |
+| <a name="input_service_bus_sku"></a> [service\_bus\_sku](#input\_service\_bus\_sku) | SKU tier for the Service Bus namespace. Basic does not support topics. Valid only if `enable_service_bus` is set to `true`. | `string` | `"Standard"` | no |
+| <a name="input_service_bus_topics"></a> [service\_bus\_topics](#input\_service\_bus\_topics) | Topic names to create on the namespace. Each topic gets a single subscription named `martini`. Requires `service_bus_sku` of `Standard` or `Premium`. Valid only if `enable_service_bus` is set to `true`. | `list(string)` | `[]` | no |
 | <a name="input_sql_database_name"></a> [sql\_database\_name](#input\_sql\_database\_name) | Name of the SQL database. Valid only if `enable_sql_server` is set to `true` | `string` | `"martini"` | no |
 | <a name="input_sql_server_admin_username"></a> [sql\_server\_admin\_username](#input\_sql\_server\_admin\_username) | Username to set in the SQl Server. Valid only if `enable_sql_server` is set to `true` | `string` | `null` | no |
 | <a name="input_sql_server_version"></a> [sql\_server\_version](#input\_sql\_server\_version) | The RDS engine version to use. Valid only if `enable_sql_server` is set to `true` | `string` | `null` | no |
@@ -138,5 +153,9 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="output_cassandra_port"></a> [cassandra\_port](#output\_cassandra\_port) | n/a |
 | <a name="output_resource_group_location"></a> [resource\_group\_location](#output\_resource\_group\_location) | n/a |
 | <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | n/a |
+| <a name="output_service_bus_endpoint"></a> [service\_bus\_endpoint](#output\_service\_bus\_endpoint) | n/a |
+| <a name="output_service_bus_namespace_name"></a> [service\_bus\_namespace\_name](#output\_service\_bus\_namespace\_name) | n/a |
+| <a name="output_service_bus_queue_names"></a> [service\_bus\_queue\_names](#output\_service\_bus\_queue\_names) | n/a |
+| <a name="output_service_bus_topic_names"></a> [service\_bus\_topic\_names](#output\_service\_bus\_topic\_names) | n/a |
 | <a name="output_subnet_prefixes"></a> [subnet\_prefixes](#output\_subnet\_prefixes) | n/a |
 <!-- END_TF_DOCS -->
