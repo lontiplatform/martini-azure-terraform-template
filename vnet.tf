@@ -39,7 +39,20 @@ module "virtual_network" {
           id = module.nat_gw.resource_id
         }
       }
-    }
+    },
+    var.enable_cassandra_tracker ? {
+      cassandra_subnet = {
+        name             = "${local.name_prefix}-cassandra-subnet"
+        address_prefixes = [var.cassandra_subnet_cidr]
+        delegation = [{
+          name = "cassandraDelegation"
+          service_delegation = {
+            name    = "Microsoft.DocumentDB/cassandraClusters"
+            actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+          }
+        }]
+      }
+    } : {}
   )
 
   tags = var.tags
