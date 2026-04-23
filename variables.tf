@@ -111,28 +111,11 @@ variable "max_size_gb" {
   default     = 50
 }
 
-// Cassandra (Cosmos DB API) tracker configuration
+// Cassandra (Managed Instance) tracker configuration
 variable "enable_cassandra_tracker" {
-  description = "Should Martini use Cosmos DB for Apache Cassandra as the tracker backend?"
+  description = "Should Martini use Azure Managed Instance for Apache Cassandra as the tracker backend?"
   type        = bool
   default     = false
-}
-
-variable "cassandra_keyspace_name" {
-  description = "Name of the Cassandra keyspace used by the Martini tracker. Valid only if `enable_cassandra_tracker` is set to `true`."
-  type        = string
-  default     = "tracker"
-}
-
-variable "cassandra_throughput" {
-  description = "Throughput (RU/s) for the Cassandra keyspace. Must be >= 400, increments of 100. Valid only if `enable_cassandra_tracker` is set to `true`."
-  type        = number
-  default     = 400
-
-  validation {
-    condition     = var.cassandra_throughput >= 400 && var.cassandra_throughput % 100 == 0
-    error_message = "cassandra_throughput must be at least 400 RU/s and specified in increments of 100."
-  }
 }
 
 variable "cassandra_subnet_cidr" {
