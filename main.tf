@@ -38,7 +38,7 @@ locals {
       source_address_prefix      = "*"
       source_port_range          = "*"
       destination_address_prefix = module.virtual_network.subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
-      destination_port_ranges    = ["80"]
+      destination_port_ranges    = ["443"]
     }
 
     "AllowAppGatewayToBackend" = {
@@ -50,7 +50,7 @@ locals {
       source_address_prefix        = module.virtual_network.subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
       source_port_range            = "*"
       destination_address_prefixes = var.private_subnet_cidrs
-      destination_port_ranges      = [tostring(local.aci_container_port)]
+      destination_port_ranges      = [tostring(var.enable_designer ? local.designer_ui_port : local.aci_container_port)]
     }
   }
 
@@ -68,12 +68,22 @@ locals {
   name_prefix        = "${terraform.workspace}-martini${var.name_suffix}"
   aci_service_name   = "${local.name_prefix}-service"
   aci_container_port = 8080
+  designer_ui_port   = 3000
 
-  tracker_dbxml_rendered = var.enable_cassandra_tracker ? templatefile("${path.module}/templates/tracker.dbxml.tftpl", {
-    contact_point = azurerm_cosmosdb_cassandra_datacenter.tracker[0].seed_node_ip_addresses[0]
-    port          = 9042
-    username      = "cassandra"
-    password      = random_password.cassandra_admin[0].result
-    ssl           = "false"
+  # Azure Managed Cassandra issues node certificates with SANs for the FQDN
+  # <dc-name>00000<n>.internal.cloudapp.net, not for the seed IP. The Datastax
+  # driver's hostname verification fails on an IP contact point and reports the
+  # SSL handshake error as an opaque NPE.
+  cassandra_node_fqdns = var.enable_cassandra_tracker ? [
+    for i in range(var.cassandra_node_count) :
+    format("%s%06d.internal.cloudapp.net", azurerm_cosmosdb_cassandra_datacenter.tracker[0].name, i)
+  ] : []
+
+  tracker_dbxml_rendered = var.enable_cassandra_tracker ? templatefile("${path.module}/templates/cassandra_tracker.dbxml.tftpl", {
+    contact_points = local.cassandra_node_fqdns
+    port           = 9042
+    username       = "cassandra"
+    password       = random_password.cassandra_admin[0].result
+    ssl            = "true"
   }) : ""
 }

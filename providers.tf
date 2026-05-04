@@ -16,6 +16,14 @@ terraform {
       source  = "hashicorp/time"
       version = "~> 0.12"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+    pkcs12 = {
+      source  = "chilicat/pkcs12"
+      version = "~> 0.2"
+    }
   }
 }
 

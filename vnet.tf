@@ -51,6 +51,9 @@ module "virtual_network" {
             actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
           }
         }]
+        nat_gateway = {
+          id = module.nat_gw.resource_id
+        }
       }
     } : {}
   )

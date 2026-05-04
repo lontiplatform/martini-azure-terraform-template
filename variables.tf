@@ -28,13 +28,25 @@ variable "martini_workspace_license" {
 
 // ACI configuration
 variable "aci_docker_image_url" {
-  description = "Docker image repository for the application (without tag). The tag is set via `martini_runtime_version`."
+  description = "Docker image repository for the Martini runtime (without tag). The tag is set via `martini_version`."
   type        = string
   default     = "lontiplatform/martini-server-runtime"
 }
 
-variable "martini_runtime_version" {
-  description = "Tag of the Martini runtime Docker image to deploy."
+variable "enable_designer" {
+  description = "Deploy `lontiplatform/martini-designer-online` as a single-instance ACI instead of the runtime. Mutually exclusive with the runtime deployment."
+  type        = bool
+  default     = false
+}
+
+variable "designer_docker_image_url" {
+  description = "Docker image repository for the Martini designer (without tag). The tag is set via `martini_version`. Valid only if `enable_designer` is set to `true`."
+  type        = string
+  default     = "lontiplatform/martini-designer-online"
+}
+
+variable "martini_version" {
+  description = "Tag of the Martini Docker image to deploy. Applied to the runtime image or the designer image depending on `enable_designer`."
   type        = string
   default     = "2.7.2"
 }
@@ -157,13 +169,23 @@ variable "cassandra_node_count" {
 }
 
 variable "cassandra_sku" {
-  description = "VM SKU for each Cassandra node. Default `Standard_E2s_v5` is the cheapest Managed-Instance-supported SKU for dev/demo; use `Standard_E8s_v5` or larger for production. Valid only if `enable_cassandra_tracker` is set to `true`."
+  description = "VM SKU for each Cassandra node. Azure Managed Cassandra only accepts a fixed list of 8-core-and-larger SKUs (see validation). Default `Standard_D8s_v5` is the cheapest supported option for dev/demo; use `Standard_E8s_v5` or larger for production."
   type        = string
-  default     = "Standard_E2s_v5"
+  default     = "Standard_D8s_v5"
 
   validation {
-    condition     = trimspace(var.cassandra_sku) != ""
-    error_message = "cassandra_sku must not be empty."
+    condition = contains([
+      "Standard_DS13_v2", "Standard_DS14_v2",
+      "Standard_D8s_v4", "Standard_D16s_v4", "Standard_D32s_v4",
+      "Standard_E8s_v4", "Standard_E16s_v4", "Standard_E20s_v4", "Standard_E32s_v4",
+      "Standard_D8s_v5", "Standard_D16s_v5", "Standard_D32s_v5",
+      "Standard_D8as_v5", "Standard_D16as_v5", "Standard_D32as_v5",
+      "Standard_E8s_v5", "Standard_E16s_v5", "Standard_E20s_v5", "Standard_E32s_v5",
+      "Standard_E8as_v5", "Standard_E16as_v5", "Standard_E20as_v5", "Standard_E32as_v5",
+      "Standard_L8s_v3", "Standard_L16s_v3", "Standard_L32s_v3",
+      "Standard_L8as_v3", "Standard_L16as_v3", "Standard_L32as_v3",
+    ], var.cassandra_sku)
+    error_message = "cassandra_sku must be one of the SKUs supported by Azure Managed Cassandra. Per-region support may be narrower; check the Azure portal if apply still fails."
   }
 }
 
@@ -252,6 +274,44 @@ variable "service_bus_topics" {
   }
 }
 
+// Event Hubs configuration (destination for Azure SQL Change Event Streaming)
+variable "enable_event_hub" {
+  description = "Should an Azure Event Hubs namespace be provisioned as the destination for Azure SQL Change Event Streaming (CES)? Pair with `enable_sql_server = true` so the SQL Server's managed identity can be granted `Azure Event Hubs Data Sender` on the hub instances."
+  type        = bool
+  default     = false
+}
+
+variable "event_hub_namespace_sku" {
+  description = "SKU tier for the Event Hubs namespace. Valid only if `enable_event_hub` is set to `true`."
+  type        = string
+  default     = "Standard"
+
+  validation {
+    condition     = contains(["Basic", "Standard", "Premium"], var.event_hub_namespace_sku)
+    error_message = "event_hub_namespace_sku must be one of: Basic, Standard, Premium."
+  }
+}
+
+variable "event_hub_capacity" {
+  description = "Throughput units (Standard) or processing units (Premium) for the namespace. Ignored for Basic. Valid only if `enable_event_hub` is set to `true`."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.event_hub_capacity >= 1 && var.event_hub_capacity <= 20
+    error_message = "event_hub_capacity must be between 1 and 20."
+  }
+}
+
+variable "event_hubs" {
+  description = "Event Hub instances to create on the namespace, keyed by name. Each entry sets `partition_count` and `message_retention` (days). The SQL Server managed identity is granted `Azure Event Hubs Data Sender` on each hub. Valid only if `enable_event_hub` is set to `true`."
+  type = map(object({
+    partition_count   = number
+    message_retention = number
+  }))
+  default = {}
+}
+
 // Virtual Network configuration
 variable "vnet_address_space" {
   description = "Virtual Network CIDR"
@@ -269,4 +329,92 @@ variable "private_subnet_cidrs" {
   description = "A list of prefixes for public subnets."
   type        = list(string)
   default     = ["10.0.11.0/24", "10.0.12.0/24"]
+}
+
+// Custom-domain TLS via acmebot
+variable "custom_domain" {
+  description = "Public hostname the Application Gateway should serve (e.g. `martini.example.com`). When set, deploys acmebot and issues a Let's Encrypt certificate into the existing Key Vault. When null, the Application Gateway keeps its self-signed certificate on the `*.cloudapp.azure.com` FQDN."
+  type        = string
+  default     = null
+}
+
+variable "appgw_use_kv_cert" {
+  description = "When true, the Application Gateway HTTPS listener references the Key-Vault-stored certificate via the AppGW user-assigned identity. Flip to true after the certificate has been issued (typically on a second `terraform apply`)."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.appgw_use_kv_cert || var.custom_domain != null
+    error_message = "appgw_use_kv_cert = true requires custom_domain to be set."
+  }
+}
+
+variable "acme_contact_email" {
+  description = "Contact email registered with the ACME CA (Let's Encrypt). Required when `custom_domain` is set."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.custom_domain == null || (var.acme_contact_email != null && length(trimspace(var.acme_contact_email)) > 0)
+    error_message = "acme_contact_email is required when custom_domain is set."
+  }
+}
+
+variable "acme_endpoint" {
+  description = "ACME directory endpoint. Defaults to Let's Encrypt production. Use `https://acme-staging-v02.api.letsencrypt.org/directory` when iterating to avoid hitting rate limits."
+  type        = string
+  default     = "https://acme-v02.api.letsencrypt.org/directory"
+}
+
+variable "acmebot_dns_provider" {
+  description = "DNS provider used by acmebot for the ACME DNS-01 challenge. Set exactly one of the optional fields. Required when `custom_domain` is set unless the user is wiring a provider via `acmebot_dns_provider` in another way."
+  sensitive   = true
+
+  type = object({
+    cloudflare = optional(object({
+      api_token = string
+    }))
+    route_53 = optional(object({
+      access_key = string
+      secret_key = string
+      region     = string
+    }))
+    azure_dns = optional(object({
+      subscription_id = string
+    }))
+    google_dns = optional(object({
+      key_file64 = string
+    }))
+    go_daddy = optional(object({
+      api_key    = string
+      api_secret = string
+    }))
+    gandi = optional(object({
+      api_key = string
+    }))
+    dns_made_easy = optional(object({
+      api_key    = string
+      secret_key = string
+    }))
+  })
+  default = null
+
+  validation {
+    condition = var.acmebot_dns_provider == null || length(compact([
+      var.acmebot_dns_provider.cloudflare == null ? "" : "cloudflare",
+      var.acmebot_dns_provider.route_53 == null ? "" : "route_53",
+      var.acmebot_dns_provider.azure_dns == null ? "" : "azure_dns",
+      var.acmebot_dns_provider.google_dns == null ? "" : "google_dns",
+      var.acmebot_dns_provider.go_daddy == null ? "" : "go_daddy",
+      var.acmebot_dns_provider.gandi == null ? "" : "gandi",
+      var.acmebot_dns_provider.dns_made_easy == null ? "" : "dns_made_easy",
+    ])) == 1
+    error_message = "Set exactly one of cloudflare, route_53, azure_dns, google_dns, go_daddy, gandi, dns_made_easy on acmebot_dns_provider."
+  }
+}
+
+variable "acmebot_allowed_ips" {
+  description = "Optional IP allowlist for the acmebot Function App. When empty, the Function App is reachable from any IP (its endpoints are anonymous — acmebot relies on Easy Auth or this allowlist for access control). Recommended to restrict to the apply host / CI runner range when not using Easy Auth."
+  type        = list(string)
+  default     = []
 }

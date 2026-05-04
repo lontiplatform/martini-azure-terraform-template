@@ -31,7 +31,7 @@ resource "time_sleep" "wait_for_role_propagation" {
   count = var.enable_cassandra_tracker ? 1 : 0
 
   depends_on      = [azurerm_role_assignment.cassandra_cosmos_db_subnet_join]
-  create_duration = "180s"
+  create_duration = "300s"
 }
 
 resource "azurerm_cosmosdb_cassandra_cluster" "tracker" {
@@ -63,6 +63,17 @@ resource "azurerm_cosmosdb_cassandra_cluster" "tracker" {
   )
 }
 
+# The cluster's REST GET flips to provisioningState=Succeeded slightly before
+# Azure's internal control-plane finishes reconciling the cluster entity.
+# Creating a data center in that window races Azure's reconciler and fails
+# with "conflicting concurrent write on the same entity" during polling.
+resource "time_sleep" "wait_for_cluster_settle" {
+  count = var.enable_cassandra_tracker ? 1 : 0
+
+  depends_on      = [azurerm_cosmosdb_cassandra_cluster.tracker]
+  create_duration = "180s"
+}
+
 resource "azurerm_cosmosdb_cassandra_datacenter" "tracker" {
   count = var.enable_cassandra_tracker ? 1 : 0
 
@@ -74,4 +85,7 @@ resource "azurerm_cosmosdb_cassandra_datacenter" "tracker" {
   sku_name                       = var.cassandra_sku
   disk_count                     = var.cassandra_disk_count
   disk_sku                       = var.cassandra_disk_sku
+  availability_zones_enabled     = false
+
+  depends_on = [time_sleep.wait_for_cluster_settle]
 }

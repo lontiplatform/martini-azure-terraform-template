@@ -3,13 +3,15 @@
   <autoStart>true</autoStart>
   <type>cassandra</type>
   <contactPoints>
-    <contactPoint0>${contact_point}</contactPoint0>
+%{ for i, cp in contact_points ~}
+    <contactPoint${i}>${cp}</contactPoint${i}>
+%{ endfor ~}
   </contactPoints>
   <port>${port}</port>
   <maxSchemaAgreementWaitSeconds>10</maxSchemaAgreementWaitSeconds>
   <credentials>
     <username>${username}</username>
-    <password>${password}</password>
+    <password><![CDATA[${password}]]></password>
   </credentials>
   <compression>NONE</compression>
   <metrics>true</metrics>

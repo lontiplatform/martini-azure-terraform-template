@@ -1,10 +1,17 @@
+resource "random_string" "kv_suffix" {
+  length  = 6
+  upper   = false
+  special = false
+  numeric = true
+}
+
 resource "azurerm_key_vault" "key_vault" {
   #checkov:skip=CKV_AZURE_42:Purge protection is not required for this template
   #checkov:skip=CKV_AZURE_110:Purge protection is not required for this template
   #checkov:skip=CKV2_AZURE_32:No need for private endpoint yet
   #checkov:skip=CKV_AZURE_109:Firewall does not provide flexibility to NAT template users
   #checkov:skip=CKV_AZURE_189:Buildtime requires public access to key vault
-  name                            = "${local.name_prefix}-kv"
+  name                            = substr("${replace(local.name_prefix, "-", "")}kv${random_string.kv_suffix.result}", 0, 24)
   location                        = azurerm_resource_group.rg.location
   resource_group_name             = azurerm_resource_group.rg.name
   enabled_for_disk_encryption     = true
@@ -72,7 +79,7 @@ resource "azurerm_key_vault_secret" "cassandra_contact_point" {
   count = var.enable_cassandra_tracker ? 1 : 0
 
   name         = "cassandra-contact-point"
-  value        = azurerm_cosmosdb_cassandra_datacenter.tracker[0].seed_node_ip_addresses[0]
+  value        = local.cassandra_node_fqdns[0]
   key_vault_id = azurerm_key_vault.key_vault.id
   content_type = "text/plain"
 

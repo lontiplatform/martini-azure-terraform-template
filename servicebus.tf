@@ -1,12 +1,11 @@
 resource "azurerm_servicebus_namespace" "this" {
   count = var.enable_service_bus ? 1 : 0
 
-  name                = "${local.name_prefix}-sb"
+  name                = local.name_prefix
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   sku                 = var.service_bus_sku
 
-  # Premium-only arguments; null on Basic/Standard so the provider ignores them.
   capacity                     = var.service_bus_sku == "Premium" ? var.service_bus_capacity : null
   premium_messaging_partitions = var.service_bus_sku == "Premium" ? var.service_bus_premium_messaging_partitions : null
 
@@ -21,7 +20,6 @@ resource "azurerm_servicebus_namespace" "this" {
   )
 }
 
-# Send-only rule issued to the external publisher (e.g. Azure SQL CES).
 resource "azurerm_servicebus_namespace_authorization_rule" "ces_send" {
   count = var.enable_service_bus ? 1 : 0
 
@@ -33,7 +31,6 @@ resource "azurerm_servicebus_namespace_authorization_rule" "ces_send" {
   manage = false
 }
 
-# Listen-only rule used by Martini to consume messages.
 resource "azurerm_servicebus_namespace_authorization_rule" "martini_listen" {
   count = var.enable_service_bus ? 1 : 0
 
