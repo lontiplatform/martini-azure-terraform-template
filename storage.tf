@@ -16,6 +16,7 @@ resource "azurerm_storage_account" "conf" {
   #checkov:skip=CKV2_AZURE_40:Shared access keys required for ACI Azure Files volume mount
   #checkov:skip=CKV2_AZURE_41:SAS tokens not used; access is via account key from ACI
   #checkov:skip=CKV2_AZURE_47:Account hosts only the Azure Files share mounted by ACI; no blobs are created so anonymous blob access is inapplicable.
+  #checkov:skip=CKV_AZURE_190:Account hosts only the Azure Files share mounted by ACI; no blob containers are created so blob public-access policy is inapplicable.
   name                = substr("${replace(local.name_prefix, "-", "")}conf${random_string.storage_suffix.result}", 0, 24)
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
@@ -71,12 +72,10 @@ resource "local_file" "tracker_dbxml" {
 resource "azurerm_storage_share_file" "tracker_dbxml" {
   count = var.enable_cassandra_tracker ? 1 : 0
 
-  name = "tracker.dbxml"
-  # Use .url (not .id) to work around azurerm bug where storage_share_file fails
-  # to parse the ARM-style share ID. https://github.com/hashicorp/terraform-provider-azurerm/issues/28032
-  storage_share_id = azurerm_storage_share.db_pool.url
-  source           = local_file.tracker_dbxml[0].filename
-  content_md5      = filemd5(local_file.tracker_dbxml[0].filename)
+  name              = "tracker.dbxml"
+  storage_share_url = azurerm_storage_share.db_pool.url
+  source            = local_file.tracker_dbxml[0].filename
+  content_md5       = local_file.tracker_dbxml[0].content_md5
 }
 
 resource "azurerm_storage_share" "designer_workspace_data" {
@@ -95,6 +94,34 @@ resource "azurerm_storage_share" "designer_workspace_user" {
   quota              = 10
 }
 
+resource "azurerm_storage_share_directory" "designer_runtime_conf" {
+  count = var.enable_designer && var.enable_cassandra_tracker ? 1 : 0
+
+  name              = "conf"
+  storage_share_url = azurerm_storage_share.designer_workspace_data[0].url
+}
+
+resource "azurerm_storage_share_directory" "designer_runtime_db_pool" {
+  count = var.enable_designer && var.enable_cassandra_tracker ? 1 : 0
+
+  name              = "conf/db-pool"
+  storage_share_url = azurerm_storage_share.designer_workspace_data[0].url
+
+  depends_on = [azurerm_storage_share_directory.designer_runtime_conf]
+}
+
+resource "azurerm_storage_share_file" "designer_tracker_dbxml" {
+  count = var.enable_designer && var.enable_cassandra_tracker ? 1 : 0
+
+  name              = "tracker.dbxml"
+  path              = "conf/db-pool"
+  storage_share_url = azurerm_storage_share.designer_workspace_data[0].url
+  source            = local_file.tracker_dbxml[0].filename
+  content_md5       = local_file.tracker_dbxml[0].content_md5
+
+  depends_on = [azurerm_storage_share_directory.designer_runtime_db_pool]
+}
+
 resource "local_file" "designer_version" {
   count = var.enable_designer ? 1 : 0
 
@@ -106,10 +133,10 @@ resource "local_file" "designer_version" {
 resource "azurerm_storage_share_file" "designer_version" {
   count = var.enable_designer ? 1 : 0
 
-  name             = ".version"
-  storage_share_id = azurerm_storage_share.designer_workspace_data[0].url
-  source           = local_file.designer_version[0].filename
-  content_md5      = md5(local_file.designer_version[0].content)
+  name              = ".version"
+  storage_share_url = azurerm_storage_share.designer_workspace_data[0].url
+  source            = local_file.designer_version[0].filename
+  content_md5       = md5(local_file.designer_version[0].content)
 
   lifecycle {
     ignore_changes       = [source, content_md5]

@@ -21,6 +21,13 @@ module "sql_server" {
   administrator_login_password = azurerm_key_vault_secret.sql_admin_password.value
   databases                    = local.databases
 
+  # System-assigned managed identity backs the local-SQL fallback for the
+  # `Azure Event Hubs Data Sender` grant when `enable_event_hub = true` and
+  # `ces_source_sql_server` is not set. Harmless when CES is not in use.
+  managed_identities = {
+    system_assigned = true
+  }
+
   tags = merge(
     var.tags, {
       "Service" = "SQLServer"

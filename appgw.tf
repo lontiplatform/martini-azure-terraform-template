@@ -1,47 +1,6 @@
-// Self-signed certificate path. Used whenever the AppGW listener is not
-// pointed at a Key-Vault-stored cert (`appgw_use_kv_cert = false`), which is
-// also the default when no custom domain is configured.
-resource "tls_private_key" "app_gw" {
-  count = var.appgw_use_kv_cert ? 0 : 1
-
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-resource "tls_self_signed_cert" "app_gw" {
-  count = var.appgw_use_kv_cert ? 0 : 1
-
-  private_key_pem = tls_private_key.app_gw[0].private_key_pem
-
-  subject {
-    common_name = azurerm_public_ip.app_gw_pip.fqdn
-  }
-
-  dns_names = [azurerm_public_ip.app_gw_pip.fqdn]
-
-  validity_period_hours = 8760
-  early_renewal_hours   = 720
-
-  allowed_uses = [
-    "key_encipherment",
-    "digital_signature",
-    "server_auth",
-  ]
-}
-
 resource "random_password" "app_gw_pfx" {
-  count = var.appgw_use_kv_cert ? 0 : 1
-
   length  = 24
   special = false
-}
-
-resource "pkcs12_from_pem" "app_gw" {
-  count = var.appgw_use_kv_cert ? 0 : 1
-
-  password        = random_password.app_gw_pfx[0].result
-  cert_pem        = tls_self_signed_cert.app_gw[0].cert_pem
-  private_key_pem = tls_private_key.app_gw[0].private_key_pem
 }
 
 module "app_gw" {
@@ -87,16 +46,11 @@ module "app_gw" {
       port = 443
     }
   }
-  ssl_certificates = var.appgw_use_kv_cert ? {
-    appGatewaySslCert = {
-      name                = "appGatewaySslCert"
-      key_vault_secret_id = data.azurerm_key_vault_certificate.appgw[0].versionless_secret_id
-    }
-    } : {
+  ssl_certificates = {
     appGatewaySslCert = {
       name     = "appGatewaySslCert"
-      data     = pkcs12_from_pem.app_gw[0].result
-      password = random_password.app_gw_pfx[0].result
+      data     = pkcs12_from_pem.app_gw.result
+      password = random_password.app_gw_pfx.result
     }
   }
   ssl_policy = {
@@ -104,16 +58,13 @@ module "app_gw" {
     policy_name = "AppGwSslPolicy20220101"
   }
   gateway_ip_configuration = {
-    subnet_id = module.virtual_network.subnets["public_subnet1"].resource.id
+    subnet_id = local.appgw_subnet_id
   }
-  managed_identities = var.appgw_use_kv_cert ? {
-    user_assigned_resource_ids = [azurerm_user_assigned_identity.appgw_kv[0].id]
-  } : {}
   http_listeners = {
     appGatewayHttpsListener = {
       name                 = "appGatewayHttpsListener"
       frontend_port_name   = "frontend-port-443"
-      host_name            = var.appgw_use_kv_cert ? var.custom_domain : azurerm_public_ip.app_gw_pip.fqdn
+      host_name            = azurerm_public_ip.app_gw_pip.fqdn
       ssl_certificate_name = "appGatewaySslCert"
     }
   }
