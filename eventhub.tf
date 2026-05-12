@@ -1,7 +1,7 @@
 resource "azurerm_eventhub_namespace" "this" {
   count = var.enable_event_hub ? 1 : 0
 
-  name                = "${local.name_prefix}-eh"
+  name                = "${substr(local.name_prefix_slug, 0, 47)}-eh"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   sku                 = var.event_hub_namespace_sku

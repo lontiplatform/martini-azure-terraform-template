@@ -11,7 +11,7 @@ resource "azurerm_key_vault" "key_vault" {
   #checkov:skip=CKV2_AZURE_32:No need for private endpoint yet
   #checkov:skip=CKV_AZURE_109:Firewall does not provide flexibility to NAT template users
   #checkov:skip=CKV_AZURE_189:Buildtime requires public access to key vault
-  name                            = substr("${replace(local.name_prefix, "-", "")}kv${random_string.kv_suffix.result}", 0, 24)
+  name                            = substr("${replace(local.name_prefix_slug, "-", "")}kv${random_string.kv_suffix.result}", 0, 24)
   location                        = azurerm_resource_group.rg.location
   resource_group_name             = azurerm_resource_group.rg.name
   enabled_for_disk_encryption     = true
@@ -31,10 +31,6 @@ resource "azurerm_key_vault" "key_vault" {
   }
 
   tags = var.tags
-
-  lifecycle {
-    ignore_changes = [access_policy]
-  }
 }
 
 resource "azurerm_key_vault_secret" "martini_workspace_license" {

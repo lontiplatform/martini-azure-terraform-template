@@ -76,7 +76,7 @@ variable "martini_node_count" {
 
   validation {
     condition     = var.martini_node_count >= 1
-    error_message = "node_count must be at least 1."
+    error_message = "martini_node_count must be at least 1."
   }
 }
 
@@ -325,7 +325,7 @@ variable "public_subnet_cidrs" {
 }
 
 variable "private_subnet_cidrs" {
-  description = "Mode A only — ignored when existing_vnet is set. A list of prefixes for public subnets."
+  description = "Mode A only — ignored when existing_vnet is set. A list of prefixes for private subnets."
   type        = list(string)
   default     = ["10.0.11.0/24", "10.0.12.0/24"]
 }

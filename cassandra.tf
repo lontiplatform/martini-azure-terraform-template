@@ -36,7 +36,7 @@ resource "time_sleep" "wait_for_role_propagation" {
 resource "azurerm_cosmosdb_cassandra_cluster" "tracker" {
   count = var.enable_cassandra_tracker ? 1 : 0
 
-  name                           = "${local.name_prefix}-cassandra"
+  name                           = "${local.name_prefix_slug}-cassandra"
   resource_group_name            = azurerm_resource_group.rg.name
   location                       = azurerm_resource_group.rg.location
   delegated_management_subnet_id = local.cassandra_subnet_id
@@ -76,7 +76,7 @@ resource "time_sleep" "wait_for_cluster_settle" {
 resource "azurerm_cosmosdb_cassandra_datacenter" "tracker" {
   count = var.enable_cassandra_tracker ? 1 : 0
 
-  name                           = "${local.name_prefix}-cassandra-dc"
+  name                           = "${local.name_prefix_slug}-cassandra-dc"
   cassandra_cluster_id           = azurerm_cosmosdb_cassandra_cluster.tracker[0].id
   location                       = azurerm_resource_group.rg.location
   delegated_management_subnet_id = local.cassandra_subnet_id

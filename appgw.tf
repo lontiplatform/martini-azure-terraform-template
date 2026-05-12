@@ -101,7 +101,7 @@ resource "azurerm_public_ip" "app_gw_pip" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   allocation_method   = "Static"
-  domain_name_label   = "${local.name_prefix}-${random_string.pip_dns_suffix.result}"
+  domain_name_label   = "${substr(local.name_prefix_slug, 0, 56)}-${random_string.pip_dns_suffix.result}"
   zones               = ["1", "2", "3"]
 
   tags = merge(

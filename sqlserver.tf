@@ -11,7 +11,7 @@ module "sql_server" {
   source  = "Azure/avm-res-sql-server/azurerm"
   version = "~> 0.1.5"
 
-  name                = "${local.name_prefix}-sql-server"
+  name                = "${substr(local.name_prefix_slug, 0, 52)}-sql-server"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   count               = var.enable_sql_server ? 1 : 0

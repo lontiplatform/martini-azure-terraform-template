@@ -17,7 +17,7 @@ resource "azurerm_storage_account" "conf" {
   #checkov:skip=CKV2_AZURE_41:SAS tokens not used; access is via account key from ACI
   #checkov:skip=CKV2_AZURE_47:Account hosts only the Azure Files share mounted by ACI; no blobs are created so anonymous blob access is inapplicable.
   #checkov:skip=CKV_AZURE_190:Account hosts only the Azure Files share mounted by ACI; no blob containers are created so blob public-access policy is inapplicable.
-  name                = substr("${replace(local.name_prefix, "-", "")}conf${random_string.storage_suffix.result}", 0, 24)
+  name                = substr("${replace(local.name_prefix_slug, "-", "")}conf${random_string.storage_suffix.result}", 0, 24)
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
 
@@ -64,7 +64,7 @@ resource "azurerm_storage_share" "runtime_packages" {
 resource "local_file" "tracker_dbxml" {
   count = var.enable_cassandra_tracker ? 1 : 0
 
-  filename        = "${path.module}/.terraform/tmp/tracker.dbxml"
+  filename        = "${path.module}/.generated/tracker.dbxml"
   content         = local.tracker_dbxml_rendered
   file_permission = "0644"
 }
@@ -125,7 +125,7 @@ resource "azurerm_storage_share_file" "designer_tracker_dbxml" {
 resource "local_file" "designer_version" {
   count = var.enable_designer ? 1 : 0
 
-  filename        = "${path.module}/.terraform/tmp/designer-version"
+  filename        = "${path.module}/.generated/designer-version"
   content         = "0.0.0"
   file_permission = "0644"
 }

@@ -51,17 +51,6 @@ locals {
       destination_port_ranges    = ["443"]
     }
 
-    "AllowAppGatewayToBackend" = {
-      name                         = "AllowAppGatewayToBackend"
-      access                       = "Allow"
-      direction                    = "Inbound"
-      priority                     = 130
-      protocol                     = "Tcp"
-      source_address_prefix        = local.appgw_subnet_cidr
-      source_port_range            = "*"
-      destination_address_prefixes = var.private_subnet_cidrs
-      destination_port_ranges      = [tostring(var.enable_designer ? local.designer_ui_port : local.aci_container_port)]
-    }
   }
 
   databases = {
@@ -75,7 +64,15 @@ locals {
     }
   }
 
-  name_prefix        = "${terraform.workspace}-martini${var.name_suffix}"
+  name_prefix = "${terraform.workspace}-martini${var.name_suffix}"
+  name_prefix_slug = trim(
+    replace(
+      replace(lower(local.name_prefix), "/[^a-z0-9-]/", "-"),
+      "/-+/", "-"
+    ),
+    "-"
+  )
+
   aci_service_name   = "${local.name_prefix}-service"
   aci_container_port = 8080
   designer_ui_port   = 3000
