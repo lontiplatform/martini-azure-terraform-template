@@ -18,6 +18,50 @@ In order to deploy the environment to the cloud, please run following commands:
 - `terraform init`
 - `terraform apply -var-file=example.tfvars`
 
+# Cost estimation
+
+> _The figures below are **estimates only** and may differ for the end user. They are retail pay-as-you-go list prices for the **East US** region, sourced from the [Azure Retail Prices API](https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices) on **2026-05-12**. Actual cost depends on region, traffic volume, storage growth, EA / CSP discounts, and price changes after that date. Bandwidth / egress, backup, and diagnostic-log retention are **not** included unless noted. Always cross-check with the [Azure Pricing Calculator](https://azure.microsoft.com/en-us/pricing/calculator/) before committing budget._
+
+## Always-on baseline (Mode A, no optional flag set)
+
+Costs that apply to every deployment with the defaults in `variables.tf`. Monthly figures assume 730 hours.
+
+| Resource | SKU / size | Unit price | Est. monthly (USD) |
+|---|---|---|---|
+| [Application Gateway](https://azure.microsoft.com/en-us/pricing/details/application-gateway/) | Standard_v2, capacity 2 | $0.20/h fixed + 2 × $0.008/h capacity unit | **~$157.68** |
+| [Public IP](https://azure.microsoft.com/en-us/pricing/details/ip-addresses/) | Standard Static IPv4 | $0.005/h | **~$3.65** |
+| [NAT Gateway](https://azure.microsoft.com/en-us/pricing/details/azure-nat-gateway/) | Standard | $0.045/h resource + $0.045/GB data processed | **~$32.85** (+ data) |
+| [Container Instances](https://azure.microsoft.com/en-us/pricing/details/container-instances/) — 1× Martini runtime | 2 vCPU + 4 GB, Linux | $0.0405/vCPU-h + $0.00445/GB-h | **~$72.13** |
+| [Key Vault](https://azure.microsoft.com/en-us/pricing/details/key-vault/) | Standard | $0.03 per 10K operations | **< $1** (ops-only) |
+| [Storage Account — Files](https://azure.microsoft.com/en-us/pricing/details/storage/files/) | Standard LRS, transaction-optimized | $0.06/GB-month for used data + per-op | **~$1–3** (low usage) |
+| Virtual Network / NSG / Route Table | n/a | free | $0 |
+| **Baseline total** | | | **≈ $267 / month** |
+
+## Optional flag deltas
+
+Each row is **on top of** the baseline. Combine them for your configuration.
+
+| Flag | What it adds | Est. delta (USD/month) |
+|---|---|---|
+| `enable_designer = true` | Swaps the runtime ACI for a single Designer ACI at the same `martini_cpu` / `martini_memory`; provisions larger storage shares (billed by actual usage, not quota). | **~$0** (no extra compute; storage delta negligible at low usage) |
+| `enable_sql_server = true` | [Azure SQL Database Single, Standard S0](https://azure.microsoft.com/en-us/pricing/details/azure-sql-database/single/) (10 DTU) @ $0.4839/day — includes up to 250 GB storage. | **+~$14.71** |
+| `enable_cassandra_tracker = true` | [Azure Managed Instance for Apache Cassandra](https://azure.microsoft.com/en-us/pricing/details/managed-instance-apache-cassandra/): 3× `Standard_D8s_v5` nodes @ $0.48/h + 3× [P30 premium disks](https://azure.microsoft.com/en-us/pricing/details/managed-disks/) @ $135.17/mo + Cassandra backup @ $0.10/GB-mo. | **+~$1,457** |
+| `enable_event_hub = true` | [Event Hubs](https://azure.microsoft.com/en-us/pricing/details/event-hubs/) Basic namespace + 1 throughput unit @ $0.015/h, plus $0.028 per 1 M ingress events. | **+~$11** (+ event volume) |
+| `existing_vnet = { ... }` (Mode B) | Skips the NAT Gateway, shared route table, and shared NSG owned by this template — outbound NAT becomes your VNet's responsibility. | **−~$32.85** (saves NAT Gateway) |
+
+## Scaling levers
+
+How the numeric inputs in `variables.tf` move the cost lines above:
+
+- **`martini_node_count = N`** (runtime mode only) — multiplies the [Container Instances](https://azure.microsoft.com/en-us/pricing/details/container-instances/) line by `N`. At defaults that's ≈ **+$72/month per extra replica**.
+- **`martini_cpu` / `martini_memory`** — ACI is billed per vCPU-second and per GB-second. Monthly cost per replica is `(martini_cpu × $0.0405 + martini_memory × $0.00445) × 730`.
+- **`cassandra_sku`** — list ranges from `Standard_D8s_v5` (**$0.48/h/node**, the default and cheapest accepted SKU) to `Standard_E32s_v5` (**$2.52/h/node**); picking a larger SKU can multiply the Cassandra compute line by up to ~5×.
+- **`cassandra_node_count`** — linear multiplier; minimum 3.
+- **`cassandra_disk_count` / `cassandra_disk_sku`** — each [P30 disk](https://azure.microsoft.com/en-us/pricing/details/managed-disks/) is $135.17/mo; bumping to P40 ($270.34/mo) or adding disks per node multiplies the disk line accordingly.
+- **`event_hub_namespace_sku`** — Basic → Standard moves the throughput-unit price from **$0.015/h** to **$0.03/h** and unlocks features billed separately (Capture $0.10/h, Kafka endpoint $0.09/h).
+- **`event_hub_capacity`** — linear multiplier on the throughput-unit line.
+- **`sql_max_size_gb`** — S0 already includes 250 GB; raising this stays free up to that ceiling. Going past 250 GB requires a higher SQL SKU than S0.
+
 # Bring-your-own VNet (Mode B)
 
 By default the template provisions a fresh VNet plus a NAT gateway, route table, and shared NSG. To deploy into an existing corporate VNet instead, set `existing_vnet` and supply CIDRs for the three workload subnets (`aci`, `appgw`, and — if `enable_cassandra_tracker = true` — `cassandra`):
@@ -279,7 +323,7 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="input_martini_version"></a> [martini\_version](#input\_martini\_version) | Tag of the Martini Docker image to deploy. Applied to the runtime image or the designer image depending on `enable_designer`. | `string` | `"2.7.2"` | no |
 | <a name="input_martini_workspace_license"></a> [martini\_workspace\_license](#input\_martini\_workspace\_license) | Full license text to be used with Martini | `string` | n/a | yes |
 | <a name="input_name_suffix"></a> [name\_suffix](#input\_name\_suffix) | Suffix to add to the resources' names | `string` | `""` | no |
-| <a name="input_private_subnet_cidrs"></a> [private\_subnet\_cidrs](#input\_private\_subnet\_cidrs) | Mode A only — ignored when existing\_vnet is set. A list of prefixes for public subnets. | `list(string)` | <pre>[<br/>  "10.0.11.0/24",<br/>  "10.0.12.0/24"<br/>]</pre> | no |
+| <a name="input_private_subnet_cidrs"></a> [private\_subnet\_cidrs](#input\_private\_subnet\_cidrs) | Mode A only — ignored when existing\_vnet is set. A list of prefixes for private subnets. | `list(string)` | <pre>[<br/>  "10.0.11.0/24",<br/>  "10.0.12.0/24"<br/>]</pre> | no |
 | <a name="input_public_subnet_cidrs"></a> [public\_subnet\_cidrs](#input\_public\_subnet\_cidrs) | Mode A only — ignored when existing\_vnet is set. A list of prefixes for public subnets. | `list(string)` | <pre>[<br/>  "10.0.1.0/24",<br/>  "10.0.2.0/24"<br/>]</pre> | no |
 | <a name="input_rg_location"></a> [rg\_location](#input\_rg\_location) | Azure region to deploy resources into | `string` | n/a | yes |
 | <a name="input_sql_database_name"></a> [sql\_database\_name](#input\_sql\_database\_name) | Name of the SQL database. Valid only if `enable_sql_server` is set to `true` | `string` | `"martini"` | no |
