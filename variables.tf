@@ -57,6 +57,29 @@ variable "docker_registry_password" {
   }
 }
 
+variable "ecr_source_credentials" {
+  description = "Private AWS ECR source for the Martini Designer image. When set, an Azure Container Registry is provisioned as a pull-through cache and the Designer ACI pulls from there instead of Docker Hub. Leave null to use the public Docker Hub image."
+  type = object({
+    account_id = string
+    region     = string
+    access_key = string
+    secret_key = string
+    repository = optional(string, "lontiplatform/martini-designer-online")
+  })
+  default   = null
+  sensitive = true
+
+  validation {
+    condition = var.ecr_source_credentials == null || (
+      trimspace(var.ecr_source_credentials.account_id) != "" &&
+      trimspace(var.ecr_source_credentials.region) != "" &&
+      trimspace(var.ecr_source_credentials.access_key) != "" &&
+      trimspace(var.ecr_source_credentials.secret_key) != ""
+    )
+    error_message = "ecr.account_id, region, access_key, and secret_key must all be non-empty when ecr is set."
+  }
+}
+
 variable "martini_cpu" {
   description = "Number of CPU cores to allocate for the application."
   type        = number
@@ -84,6 +107,29 @@ variable "martini_home_path" {
   description = "Path to the Martini workspace inside the container image. Default matches the official lontiplatform/martini-server-runtime image."
   type        = string
   default     = "/data"
+}
+
+variable "enable_log_analytics" {
+  description = "Provision a Log Analytics workspace and stream container stdout/stderr from the Martini ACIs into it via the diagnostics.log_analytics block. Workspace uses the PerGB2018 SKU with 30-day retention. Required for the log-based alerts."
+  type        = bool
+  default     = false
+}
+
+variable "alert_emails" {
+  description = "List of email addresses that receive every alert fired by the action group. Each address becomes a separate email_receiver. Leave empty to provision the action group with no receivers (alerts still fire but go nowhere)."
+  type        = list(string)
+  default     = []
+}
+
+variable "martini_premium_share_quota_gb" {
+  description = "Provisioned capacity (GiB) applied uniformly to every ACI-mounted Premium FileStorage share. Premium shares bill on provisioned GiB at ~$0.16/GiB-month (LRS, Central US); 100 is the minimum Azure will accept."
+  type        = number
+  default     = 100
+
+  validation {
+    condition     = var.martini_premium_share_quota_gb >= 100
+    error_message = "martini_premium_share_quota_gb must be at least 100 (Azure Premium FileStorage minimum)."
+  }
 }
 
 // SQL Server configuration
@@ -186,7 +232,7 @@ variable "cassandra_sku" {
 variable "cassandra_disk_count" {
   description = "Number of premium managed disks attached to each Cassandra node. Valid only if `enable_cassandra_tracker` is set to `true`."
   type        = number
-  default     = 1
+  default     = 4
 
   validation {
     condition     = var.cassandra_disk_count >= 1
@@ -213,9 +259,9 @@ variable "enable_event_hub" {
 }
 
 variable "event_hub_namespace_sku" {
-  description = "SKU tier for the Event Hubs namespace. Valid only if `enable_event_hub` is set to `true`."
+  description = "SKU tier for the Event Hubs namespace. Must be `Standard` or higher for Martini's Kafka-protocol CES consumer — Basic-tier namespaces do not expose port 9093. Valid only if `enable_event_hub` is set to `true`."
   type        = string
-  default     = "Basic"
+  default     = "Standard"
 
   validation {
     condition     = contains(["Basic", "Standard", "Premium"], var.event_hub_namespace_sku)
@@ -250,6 +296,45 @@ variable "ces_source_sql_server" {
     resource_group_name = string
   })
   default = null
+}
+
+// Azure Communication Services (Email / SMTP) configuration
+variable "enable_communication_services_email" {
+  description = "Provision Azure Communication Services Email with the Azure-managed sender subdomain (<random>.azurecomm.net) and expose SMTP relay credentials (smtp.azurecomm.net:587) to the Martini ACIs. Includes an Entra app registration used as the SMTP principal with the `Contributor` role on the Communication Services resource. Subject to the Azure-managed-domain quota (~100 emails/day, 10 recipients per message); use a custom verified domain for production volume."
+  type        = bool
+  default     = true
+}
+
+variable "communication_email_sender_username" {
+  description = "Identifier used for both (a) the ACS SMTP Username resource (SMTP AUTH login string) and (b) the local-part of the sender address on the Azure-managed domain. Default `martini` yields `martini` as the SMTP login and `martini@<random>.azurecomm.net` as the From address. Valid only if `enable_communication_services_email` is set to `true`."
+  type        = string
+  default     = "martini"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.communication_email_sender_username))
+    error_message = "communication_email_sender_username must be 1-64 chars of letters, digits, or hyphens (intersection of the SMTP Username resource constraint `^[a-zA-Z0-9-]+$` and the email local-part length cap)."
+  }
+}
+
+variable "communication_email_smtp_entra_app" {
+  description = "Existing Microsoft Entra application used as the SMTP authentication principal against the Communication Services resource. Have your tenant admin create the app (Application Developer is sufficient) in the same tenant as the subscription, then capture: `client_id` (Application (client) ID), `sp_object_id` (Enterprise Application → Object ID, NOT the app registration Object ID), and `client_secret` (value of a client secret you generated on the app). Required when `enable_communication_services_email = true`."
+  type = object({
+    client_id     = string
+    sp_object_id  = string
+    client_secret = string
+  })
+  default   = null
+  sensitive = true
+
+  validation {
+    condition     = var.communication_email_smtp_entra_app == null || alltrue([for v in [try(var.communication_email_smtp_entra_app.client_id, ""), try(var.communication_email_smtp_entra_app.sp_object_id, ""), try(var.communication_email_smtp_entra_app.client_secret, "")] : trimspace(v) != ""])
+    error_message = "communication_email_smtp_entra_app fields client_id, sp_object_id, and client_secret must all be non-empty."
+  }
+
+  validation {
+    condition     = !var.enable_communication_services_email || var.communication_email_smtp_entra_app != null
+    error_message = "communication_email_smtp_entra_app must be set when enable_communication_services_email is true. Have your tenant admin pre-create the Entra app and supply { client_id, sp_object_id, client_secret }."
+  }
 }
 
 // Virtual Network configuration
@@ -300,6 +385,22 @@ variable "appgw_subnet_cidr" {
   }
 }
 
+variable "aca_subnet_cidr" {
+  description = "CIDR for the Azure Container Apps delegated subnet. Minimum /27 (32 IPs) for a Workload Profile environment. Required when existing_vnet is set; in Mode A the subnet is created from this CIDR via the AVM module."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.aca_subnet_cidr == null || can(cidrhost(var.aca_subnet_cidr, 0))
+    error_message = "aca_subnet_cidr must be a valid CIDR block."
+  }
+
+  validation {
+    condition     = var.aca_subnet_cidr == null || tonumber(regex("/(\\d+)$", var.aca_subnet_cidr)[0]) <= 27
+    error_message = "aca_subnet_cidr prefix length must be /27 or larger (prefix number <= 27)."
+  }
+}
+
 variable "byo_vnet_route_table_id" {
   description = "Optional ID of a pre-existing route table to associate with the ACI and Cassandra subnets when existing_vnet is set. Leave null to use Azure system routes. Ignored when existing_vnet is null."
   type        = string
@@ -328,5 +429,53 @@ variable "private_subnet_cidrs" {
   description = "Mode A only — ignored when existing_vnet is set. A list of prefixes for private subnets."
   type        = list(string)
   default     = ["10.0.11.0/24", "10.0.12.0/24"]
+}
+
+// Custom domain / ACME (keyvault-acmebot) configuration
+variable "custom_domain" {
+  description = "Public FQDN to bind to the Application Gateway via a second SNI listener (e.g. cooper.external.lonti.com). When empty, the Acmebot Function App, the Key Vault access policies for it, and the second HTTPS listener are all skipped. The A record for this hostname is created manually in DNS — Acmebot only manages the DNS-01 TXT records during issuance."
+  type        = string
+  default     = ""
+}
+
+variable "acme_contact_email" {
+  description = "Contact email registered with the ACME account used by keyvault-acmebot. Required when custom_domain is set. Let's Encrypt sends expiry warnings here."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.acme_contact_email == "" || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.acme_contact_email))
+    error_message = "acme_contact_email must be a valid email address or empty."
+  }
+}
+
+variable "acme_endpoint" {
+  description = "ACME directory URL used by keyvault-acmebot. Defaults to the Let's Encrypt staging directory so the first apply produces a non-rate-limited STAGING cert. Flip to https://acme-v02.api.letsencrypt.org/directory for production issuance — issue-cert.sh detects the staging↔prod issuer mismatch and forces re-issuance automatically; no manual KV purge needed."
+  type        = string
+  default     = "https://acme-staging-v02.api.letsencrypt.org/directory"
+
+  validation {
+    condition = contains([
+      "https://acme-staging-v02.api.letsencrypt.org/directory",
+      "https://acme-v02.api.letsencrypt.org/directory",
+    ], var.acme_endpoint)
+    error_message = "acme_endpoint must be the Let's Encrypt staging or production directory URL."
+  }
+}
+
+variable "acmebot_route53" {
+  description = "AWS Route53 credentials passed to the Acmebot Function App as application settings. The IAM principal needs route53:ListHostedZones, route53:GetChange, and route53:ChangeResourceRecordSets on the hosted zone covering custom_domain. Required when custom_domain is set. Not consumed by an AWS provider — there is no AWS provider in this repo."
+  type = object({
+    access_key = string
+    secret_key = string
+    region     = string
+  })
+  default   = null
+  sensitive = true
+
+  validation {
+    condition     = var.acmebot_route53 == null || (trimspace(var.acmebot_route53.access_key) != "" && trimspace(var.acmebot_route53.secret_key) != "" && trimspace(var.acmebot_route53.region) != "")
+    error_message = "acmebot_route53.access_key, secret_key, and region must all be non-empty when the object is set."
+  }
 }
 

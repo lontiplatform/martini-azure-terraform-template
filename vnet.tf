@@ -57,7 +57,23 @@ module "virtual_network" {
           id = module.nat_gw[0].resource_id
         }
       }
-    } : {}
+    } : {},
+    {
+      aca_subnet = {
+        name             = "${local.name_prefix}-aca-subnet"
+        address_prefixes = [var.aca_subnet_cidr]
+        delegation = [{
+          name = "acaDelegation"
+          service_delegation = {
+            name    = "Microsoft.App/environments"
+            actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+          }
+        }]
+        nat_gateway = {
+          id = module.nat_gw[0].resource_id
+        }
+      }
+    }
   )
 
   tags = var.tags
@@ -193,11 +209,36 @@ resource "azurerm_subnet" "cassandra" {
   }
 }
 
+resource "azurerm_subnet" "aca" {
+  count = local.byo_vnet ? 1 : 0
+
+  name                 = "${local.name_prefix}-aca"
+  resource_group_name  = var.existing_vnet.resource_group_name
+  virtual_network_name = data.azurerm_virtual_network.existing[0].name
+  address_prefixes     = [var.aca_subnet_cidr]
+
+  delegation {
+    name = "acaDelegation"
+    service_delegation {
+      name    = "Microsoft.App/environments"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.aca_subnet_cidr != null
+      error_message = "aca_subnet_cidr must be set when existing_vnet is non-null."
+    }
+  }
+}
+
 # Mode B: AppGW v2 requires GatewayManager 65200-65535 inbound and a 443
 # listener path. In Mode A these rules are carried by module.network_sg
 # attached to the public subnets; in Mode B no shared NSG is created, so we
 # create a dedicated one and attach it only to the AppGW subnet.
 resource "azurerm_network_security_group" "appgw" {
+  #checkov:skip=CKV_AZURE_160:Port 80 is required so AppGW can serve the HTTP→HTTPS redirect rule and ACME HTTP-01 challenge fallback; HTTPS termination still happens on 443.
   count = local.byo_vnet ? 1 : 0
 
   name                = "${local.name_prefix}-appgw-nsg"
@@ -223,7 +264,7 @@ resource "azurerm_network_security_group" "appgw" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "443"
+    destination_port_ranges    = ["80", "443"]
     source_address_prefix      = "*"
     destination_address_prefix = var.appgw_subnet_cidr
   }
@@ -263,5 +304,19 @@ resource "azurerm_subnet_network_security_group_association" "cassandra" {
   count = local.byo_vnet && var.enable_cassandra_tracker && var.byo_vnet_workload_nsg_id != null ? 1 : 0
 
   subnet_id                 = azurerm_subnet.cassandra[0].id
+  network_security_group_id = var.byo_vnet_workload_nsg_id
+}
+
+resource "azurerm_subnet_route_table_association" "aca" {
+  count = local.byo_vnet && var.byo_vnet_route_table_id != null ? 1 : 0
+
+  subnet_id      = azurerm_subnet.aca[0].id
+  route_table_id = var.byo_vnet_route_table_id
+}
+
+resource "azurerm_subnet_network_security_group_association" "aca" {
+  count = local.byo_vnet && var.byo_vnet_workload_nsg_id != null ? 1 : 0
+
+  subnet_id                 = azurerm_subnet.aca[0].id
   network_security_group_id = var.byo_vnet_workload_nsg_id
 }

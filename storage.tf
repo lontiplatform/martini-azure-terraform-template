@@ -21,7 +21,8 @@ resource "azurerm_storage_account" "conf" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
 
-  account_tier              = "Standard"
+  account_kind              = "FileStorage"
+  account_tier              = "Premium"
   account_replication_type  = "LRS"
   min_tls_version           = "TLS1_2"
   shared_access_key_enabled = true
@@ -34,7 +35,8 @@ resource "azurerm_storage_account" "conf" {
 resource "azurerm_storage_share" "db_pool" {
   name               = "db-pool"
   storage_account_id = azurerm_storage_account.conf.id
-  quota              = 1
+  quota              = var.martini_premium_share_quota_gb
+  access_tier        = "Premium"
 }
 
 resource "azurerm_storage_share" "runtime_lib_ext" {
@@ -42,7 +44,8 @@ resource "azurerm_storage_share" "runtime_lib_ext" {
 
   name               = "runtime-lib-ext"
   storage_account_id = azurerm_storage_account.conf.id
-  quota              = 5
+  quota              = var.martini_premium_share_quota_gb
+  access_tier        = "Premium"
 }
 
 resource "azurerm_storage_share" "runtime_conf_overrides" {
@@ -50,7 +53,8 @@ resource "azurerm_storage_share" "runtime_conf_overrides" {
 
   name               = "runtime-conf-overrides"
   storage_account_id = azurerm_storage_account.conf.id
-  quota              = 1
+  quota              = var.martini_premium_share_quota_gb
+  access_tier        = "Premium"
 }
 
 resource "azurerm_storage_share" "runtime_packages" {
@@ -58,7 +62,8 @@ resource "azurerm_storage_share" "runtime_packages" {
 
   name               = "runtime-packages"
   storage_account_id = azurerm_storage_account.conf.id
-  quota              = 50
+  quota              = var.martini_premium_share_quota_gb
+  access_tier        = "Premium"
 }
 
 resource "local_file" "tracker_dbxml" {
@@ -83,7 +88,8 @@ resource "azurerm_storage_share" "designer_workspace_data" {
 
   name               = "designer-workspace-data"
   storage_account_id = azurerm_storage_account.conf.id
-  quota              = 100
+  quota              = var.martini_premium_share_quota_gb
+  access_tier        = "Premium"
 }
 
 resource "azurerm_storage_share" "designer_workspace_user" {
@@ -91,7 +97,8 @@ resource "azurerm_storage_share" "designer_workspace_user" {
 
   name               = "designer-workspace-user"
   storage_account_id = azurerm_storage_account.conf.id
-  quota              = 10
+  quota              = var.martini_premium_share_quota_gb
+  access_tier        = "Premium"
 }
 
 resource "azurerm_storage_share_directory" "designer_runtime_conf" {

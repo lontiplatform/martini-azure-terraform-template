@@ -8,6 +8,8 @@ locals {
 
   aci_subnet_ids = local.byo_vnet ? [azurerm_subnet.aci[0].id] : local.private_subnet_ids
 
+  aca_subnet_id = local.byo_vnet ? azurerm_subnet.aca[0].id : module.virtual_network[0].subnets["aca_subnet"].resource.id
+
   appgw_subnet_id = local.byo_vnet ? azurerm_subnet.appgw[0].id : module.virtual_network[0].subnets["public_subnet1"].resource.id
 
   appgw_subnet_cidr = local.byo_vnet ? var.appgw_subnet_cidr : module.virtual_network[0].subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
@@ -48,7 +50,7 @@ locals {
       source_address_prefix      = "*"
       source_port_range          = "*"
       destination_address_prefix = local.appgw_subnet_cidr
-      destination_port_ranges    = ["443"]
+      destination_port_ranges    = ["80", "443"]
     }
 
   }
@@ -77,7 +79,25 @@ locals {
   aci_container_port = 8080
   designer_ui_port   = 3000
 
-  aci_docker_image_url = var.enable_designer ? "lontiplatform/martini-designer-online" : "lontiplatform/martini-server-runtime"
+  aci_docker_image_url = (
+    var.enable_designer && var.ecr_source_credentials != null
+    ? "${azurerm_container_registry.ecr_mirror[0].login_server}/lontiplatform/martini-designer-online"
+    : (var.enable_designer ? "lontiplatform/martini-designer-online" : "lontiplatform/martini-server-runtime")
+  )
+
+  designer_registry_credential = (
+    var.enable_designer && var.ecr_source_credentials != null
+    ? {
+      server   = azurerm_container_registry.ecr_mirror[0].login_server
+      username = azurerm_container_registry_token.aci_designer_pull[0].name
+      password = azurerm_container_registry_token_password.aci_designer_pull[0].password1[0].value
+    }
+    : (var.docker_registry_username != "" ? {
+      server   = "index.docker.io"
+      username = var.docker_registry_username
+      password = var.docker_registry_password
+    } : null)
+  )
 
   # Azure Managed Cassandra issues node certificates with SANs for the FQDN
   # <dc-name>00000<n>.internal.cloudapp.net, not for the seed IP. The Datastax
@@ -95,4 +115,56 @@ locals {
     password       = random_password.cassandra_admin[0].result
     ssl            = "true"
   }) : ""
+
+  # ACS data_location is a curated residency label, not an Azure region.
+  acs_data_location_by_region = {
+    eastus             = "United States"
+    eastus2            = "United States"
+    centralus          = "United States"
+    northcentralus     = "United States"
+    southcentralus     = "United States"
+    westus             = "United States"
+    westus2            = "United States"
+    westus3            = "United States"
+    westcentralus      = "United States"
+    canadacentral      = "Canada"
+    canadaeast         = "Canada"
+    brazilsouth        = "Brazil"
+    northeurope        = "Europe"
+    westeurope         = "Europe"
+    swedencentral      = "Europe"
+    swedensouth        = "Europe"
+    francecentral      = "France"
+    francesouth        = "France"
+    germanywestcentral = "Germany"
+    germanynorth       = "Germany"
+    norwayeast         = "Norway"
+    norwaywest         = "Norway"
+    switzerlandnorth   = "Switzerland"
+    switzerlandwest    = "Switzerland"
+    uksouth            = "UK"
+    ukwest             = "UK"
+    uaenorth           = "UAE"
+    uaecentral         = "UAE"
+    australiaeast      = "Australia"
+    australiasoutheast = "Australia"
+    australiacentral   = "Australia"
+    australiacentral2  = "Australia"
+    southeastasia      = "Asia Pacific"
+    eastasia           = "Asia Pacific"
+    japaneast          = "Japan"
+    japanwest          = "Japan"
+    koreacentral       = "Korea"
+    koreasouth         = "Korea"
+    centralindia       = "India"
+    southindia         = "India"
+    westindia          = "India"
+    southafricanorth   = "Africa"
+    southafricawest    = "Africa"
+    usgovvirginia      = "usgov"
+    usgovarizona       = "usgov"
+    usgovtexas         = "usgov"
+  }
+
+  acs_data_location = lookup(local.acs_data_location_by_region, lower(var.rg_location), "United States")
 }

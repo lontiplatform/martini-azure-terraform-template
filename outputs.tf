@@ -48,3 +48,43 @@ output "event_hub_namespace_fqdn" {
 output "event_hub_names" {
   value = var.enable_event_hub ? sort([for h in azurerm_eventhub.this : h.name]) : []
 }
+
+output "log_analytics_workspace_name" {
+  value = var.enable_log_analytics ? azurerm_log_analytics_workspace.this[0].name : null
+}
+
+output "log_analytics_workspace_id" {
+  value = var.enable_log_analytics ? azurerm_log_analytics_workspace.this[0].id : null
+}
+
+output "communication_services_smtp_host" {
+  value = var.enable_communication_services_email ? "smtp.azurecomm.net" : null
+}
+
+output "communication_services_smtp_port" {
+  value = var.enable_communication_services_email ? 587 : null
+}
+
+output "communication_services_sender_address" {
+  value = local.acs_sender_address
+}
+
+output "communication_services_email_domain" {
+  value = var.enable_communication_services_email ? azurerm_email_communication_service_domain.this[0].from_sender_domain : null
+}
+
+output "custom_domain_url" {
+  value       = local.acmebot_enabled ? "https://${var.custom_domain}" : null
+  description = "Public HTTPS URL of the custom-domain listener once the A record for var.custom_domain is pointed at app_gw_public_ip."
+}
+
+output "acmebot_function_host" {
+  value       = local.acmebot_enabled ? local.acmebot_function_host : null
+  description = "Default hostname of the keyvault-acmebot Function App. Useful for operator debugging (e.g. log tail, manual /api/certificate POSTs)."
+}
+
+output "acmebot_function_key" {
+  value       = local.acmebot_enabled ? module.acmebot[0].api_key : null
+  description = "Default Functions API key for the keyvault-acmebot Function App. Required for any manual call to /api/certificate."
+  sensitive   = true
+}

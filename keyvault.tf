@@ -23,14 +23,16 @@ resource "azurerm_key_vault" "key_vault" {
 
   sku_name = "standard"
 
-  access_policy {
-    tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = data.azurerm_client_config.current.object_id
-
-    secret_permissions = ["Get", "List", "Set", "Delete", "Purge", "Recover"]
-  }
-
   tags = var.tags
+}
+
+resource "azurerm_key_vault_access_policy" "deployer" {
+  key_vault_id = azurerm_key_vault.key_vault.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = data.azurerm_client_config.current.object_id
+
+  secret_permissions      = ["Get", "List", "Set", "Delete", "Purge", "Recover"]
+  certificate_permissions = ["Get", "List"]
 }
 
 resource "azurerm_key_vault_secret" "martini_workspace_license" {
@@ -106,4 +108,114 @@ resource "azurerm_key_vault_secret" "event_hub_names" {
   content_type = "text/plain"
 
   tags = var.tags
+}
+
+resource "azurerm_key_vault_secret" "event_hub_listener_connection_string" {
+  #checkov:skip=CKV_AZURE_41:Skipping secret expiration
+  count = var.enable_event_hub ? 1 : 0
+
+  name         = "event-hub-listener-connection-string"
+  value        = azurerm_eventhub_namespace_authorization_rule.martini_listener[0].primary_connection_string
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "secret"
+
+  tags = var.tags
+}
+
+resource "azurerm_key_vault_secret" "smtp_host" {
+  #checkov:skip=CKV_AZURE_41:Non-secret plaintext SMTP host; no expiry needed.
+  count = var.enable_communication_services_email ? 1 : 0
+
+  name         = "smtp-host"
+  value        = "smtp.azurecomm.net"
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "text/plain"
+
+  tags = var.tags
+}
+
+resource "azurerm_key_vault_secret" "smtp_port" {
+  #checkov:skip=CKV_AZURE_41:Non-secret plaintext SMTP port; no expiry needed.
+  count = var.enable_communication_services_email ? 1 : 0
+
+  name         = "smtp-port"
+  value        = "587"
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "text/plain"
+
+  tags = var.tags
+}
+
+resource "azurerm_key_vault_secret" "smtp_username" {
+  #checkov:skip=CKV_AZURE_41:Skipping secret expiration
+  count = var.enable_communication_services_email ? 1 : 0
+
+  name         = "smtp-username"
+  value        = local.acs_smtp_username
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "username"
+
+  tags = var.tags
+}
+
+resource "azurerm_key_vault_secret" "smtp_password" {
+  #checkov:skip=CKV_AZURE_41:Skipping secret expiration
+  count = var.enable_communication_services_email ? 1 : 0
+
+  name         = "smtp-password"
+  value        = var.communication_email_smtp_entra_app.client_secret
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "secret"
+
+  tags = var.tags
+}
+
+resource "azurerm_key_vault_secret" "smtp_sender_address" {
+  #checkov:skip=CKV_AZURE_41:Non-secret plaintext sender address; no expiry needed.
+  count = var.enable_communication_services_email ? 1 : 0
+
+  name         = "smtp-sender-address"
+  value        = local.acs_sender_address
+  key_vault_id = azurerm_key_vault.key_vault.id
+  content_type = "text/plain"
+
+  tags = var.tags
+}
+
+# Acmebot Function App MI: needs full cert lifecycle perms to create/import
+# the ACME-issued cert into Key Vault and to renew it on schedule.
+resource "azurerm_key_vault_access_policy" "acmebot" {
+  count = local.acmebot_enabled ? 1 : 0
+
+  key_vault_id = azurerm_key_vault.key_vault.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = module.acmebot[0].principal_id
+
+  certificate_permissions = [
+    "Get",
+    "List",
+    "Create",
+    "Update",
+    "Import",
+    "Delete",
+    "Recover",
+  ]
+
+  secret_permissions = [
+    "Get",
+    "List",
+  ]
+}
+
+# Application Gateway UAMI: read-only — used at runtime to fetch the cert
+# referenced by versionless_secret_id.
+resource "azurerm_key_vault_access_policy" "appgw_kv" {
+  count = local.acmebot_enabled ? 1 : 0
+
+  key_vault_id = azurerm_key_vault.key_vault.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_user_assigned_identity.appgw_kv[0].principal_id
+
+  certificate_permissions = ["Get"]
+  secret_permissions      = ["Get"]
 }

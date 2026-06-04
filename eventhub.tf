@@ -11,13 +11,25 @@ resource "azurerm_eventhub_namespace" "this" {
   # and service-endpoint-only namespaces are rejected.
   public_network_access_enabled = true
   minimum_tls_version           = "1.2"
-  local_authentication_enabled  = false
+  local_authentication_enabled  = true
 
   tags = merge(
     var.tags, {
       "Service" = "EventHub"
     }
   )
+}
+
+resource "azurerm_eventhub_namespace_authorization_rule" "martini_listener" {
+  count = var.enable_event_hub ? 1 : 0
+
+  name                = "martini-listener"
+  namespace_name      = azurerm_eventhub_namespace.this[0].name
+  resource_group_name = azurerm_resource_group.rg.name
+
+  listen = true
+  send   = false
+  manage = false
 }
 
 resource "azurerm_eventhub" "this" {
@@ -69,16 +81,6 @@ resource "time_sleep" "ces_role_propagation" {
 
 locals {
   martini_eh_consumer_group = "$Default"
-
-  # Cartesian product of (runtime replica index, hub key); used only when runtime mode is active.
-  martini_runtime_eh_receiver_pairs = (
-    var.enable_event_hub && !var.enable_designer && length(var.event_hubs) > 0
-    ? {
-      for pair in setproduct(range(var.martini_node_count), keys(var.event_hubs)) :
-      "${pair[0]}-${pair[1]}" => { replica_index = pair[0], hub_key = pair[1] }
-    }
-    : {}
-  )
 }
 
 resource "azurerm_role_assignment" "martini_designer_eh_receiver" {
@@ -86,15 +88,15 @@ resource "azurerm_role_assignment" "martini_designer_eh_receiver" {
 
   scope                = each.value.id
   role_definition_name = "Azure Event Hubs Data Receiver"
-  principal_id         = azurerm_container_group.martini_designer[0].identity[0].principal_id
+  principal_id         = azurerm_container_app.martini_designer[0].identity[0].principal_id
 }
 
 resource "azurerm_role_assignment" "martini_runtime_eh_receiver" {
-  for_each = local.martini_runtime_eh_receiver_pairs
+  for_each = var.enable_event_hub && !var.enable_designer && length(var.event_hubs) > 0 ? azurerm_eventhub.this : {}
 
-  scope                = azurerm_eventhub.this[each.value.hub_key].id
+  scope                = each.value.id
   role_definition_name = "Azure Event Hubs Data Receiver"
-  principal_id         = azurerm_container_group.martini[each.value.replica_index].identity[0].principal_id
+  principal_id         = azurerm_container_app.martini[0].identity[0].principal_id
 }
 
 # Hold apply long enough for RBAC to propagate so Martini's first connect succeeds.
