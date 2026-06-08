@@ -36,6 +36,8 @@ locals {
     var.enable_cassandra_tracker ? [
       { name = "MR_TRACKER_ENABLE_EMBEDDED_DATABASE", value = "false" },
       { name = "MR_TRACKER_DATABASE_NAME", value = "tracker" },
+      { name = "MR_TRACKER_DATABASE_USER", value = "cassandra" },
+      { name = "MR_TRACKER_DATABASE_PASSWORD", secret_name = "cassandra-admin-password" },
     ] : [],
     var.enable_event_hub && length(var.event_hubs) > 0 ? [
       { name = "MR_EVENT_HUB_NAMESPACE_FQDN", value = "${azurerm_eventhub_namespace.this[0].name}.servicebus.windows.net" },
@@ -71,6 +73,8 @@ locals {
     var.enable_cassandra_tracker ? [
       { name = "MR_TRACKER_ENABLE_EMBEDDED_DATABASE", value = "false" },
       { name = "MR_TRACKER_DATABASE_NAME", value = "tracker" },
+      { name = "MR_TRACKER_DATABASE_USER", value = "cassandra" },
+      { name = "MR_TRACKER_DATABASE_PASSWORD", secret_name = "cassandra-admin-password" },
     ] : [],
     var.enable_event_hub && length(var.event_hubs) > 0 ? [
       { name = "MR_EVENT_HUB_NAMESPACE_FQDN", value = "${azurerm_eventhub_namespace.this[0].name}.servicebus.windows.net" },
@@ -100,6 +104,9 @@ locals {
     },
     local.designer_registry_credential != null ? {
       "registry-password" = local.designer_registry_credential.password
+    } : {},
+    var.enable_cassandra_tracker ? {
+      "cassandra-admin-password" = random_password.cassandra_admin[0].result
     } : {},
     var.enable_event_hub && length(var.event_hubs) > 0 ? {
       "eh-connection-string" = azurerm_eventhub_namespace_authorization_rule.martini_listener[0].primary_connection_string
