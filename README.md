@@ -1,7 +1,7 @@
 # Martini Terraform Template
 
 The repository contains a Terraform template to create a complete infrastructure running Martini Runtime in the cloud 
-on Azure ACI along with optional dependency such as an SQL database.
+on Azure Container Apps along with optional dependency such as an SQL database.
 
 # Requirements
 
@@ -28,14 +28,14 @@ Costs that apply to every deployment with the defaults in `variables.tf`. Monthl
 
 | Resource | SKU / size | Unit price | Est. monthly (USD) |
 |---|---|---|---|
-| [Application Gateway](https://azure.microsoft.com/en-us/pricing/details/application-gateway/) | Standard_v2, capacity 2 | $0.20/h fixed + 2 × $0.008/h capacity unit | **~$157.68** |
-| [Public IP](https://azure.microsoft.com/en-us/pricing/details/ip-addresses/) | Standard Static IPv4 | $0.005/h | **~$3.65** |
 | [NAT Gateway](https://azure.microsoft.com/en-us/pricing/details/azure-nat-gateway/) | Standard | $0.045/h resource + $0.045/GB data processed | **~$32.85** (+ data) |
-| [Container Instances](https://azure.microsoft.com/en-us/pricing/details/container-instances/) — 1× Martini runtime | 2 vCPU + 4 GB, Linux | $0.0405/vCPU-h + $0.00445/GB-h | **~$72.13** |
+| [Container Apps](https://azure.microsoft.com/en-us/pricing/details/container-apps/) — 1× Martini runtime | Consumption, 2 vCPU + 4 GB, 1 replica always active | per-second vCPU/memory billing (free monthly grant applies) | **~$72** (1 always-active replica) |
 | [Key Vault](https://azure.microsoft.com/en-us/pricing/details/key-vault/) | Standard | $0.03 per 10K operations | **< $1** (ops-only) |
 | [Storage Account — Files](https://azure.microsoft.com/en-us/pricing/details/storage/files/) | Standard LRS, transaction-optimized | $0.06/GB-month for used data + per-op | **~$1–3** (low usage) |
-| Virtual Network / NSG / Route Table | n/a | free | $0 |
-| **Baseline total** | | | **≈ $267 / month** |
+| Virtual Network | n/a | free | $0 |
+| **Baseline total** | | | **≈ $108 / month** |
+
+> The Container App environment uses **external** ingress with its built-in load balancer and a free Microsoft-managed certificate on the `*.azurecontainerapps.io` FQDN — there is no Application Gateway, public IP, or self-managed cert pipeline in the baseline.
 
 ## Optional flag deltas
 
@@ -43,20 +43,20 @@ Each row is **on top of** the baseline. Combine them for your configuration.
 
 | Flag | What it adds | Est. delta (USD/month) |
 |---|---|---|
-| `enable_designer = true` | Swaps the runtime ACI for a single Designer ACI at the same `martini_cpu` / `martini_memory`; provisions larger storage shares (billed by actual usage, not quota). | **~$0** (no extra compute; storage delta negligible at low usage) |
+| `enable_designer = true` | Swaps the runtime container app for a single Designer container app at the same `martini_cpu` / `martini_memory`; provisions larger storage shares (billed by actual usage, not quota). | **~$0** (no extra compute; storage delta negligible at low usage) |
 | `enable_sql_server = true` | [Azure SQL Database Single, Standard S0](https://azure.microsoft.com/en-us/pricing/details/azure-sql-database/single/) (10 DTU) @ $0.4839/day — includes up to 250 GB storage. | **+~$14.71** |
 | `enable_cassandra_tracker = true` | [Azure Managed Instance for Apache Cassandra](https://azure.microsoft.com/en-us/pricing/details/managed-instance-apache-cassandra/): 3× `Standard_D8s_v5` nodes @ $0.48/h + 3× [P30 premium disks](https://azure.microsoft.com/en-us/pricing/details/managed-disks/) @ $135.17/mo + Cassandra backup @ $0.10/GB-mo. | **+~$1,457** |
 | `enable_event_hub = true` | [Event Hubs](https://azure.microsoft.com/en-us/pricing/details/event-hubs/) Basic namespace + 1 throughput unit @ $0.015/h, plus $0.028 per 1 M ingress events. | **+~$11** (+ event volume) |
 | `enable_communication_services_email = true` (default) | [Azure Communication Services Email](https://azure.microsoft.com/en-us/pricing/details/communication-services/) — no fixed monthly fee, billed per message. List price as of 2026-05-12: $0.00025 per email + $0.00012/MB of message data. Azure-managed-domain quota caps usage at ~100/day. | **~$0** at quota (≤ ~$0.75/mo) |
-| `custom_domain = "<fqdn>"` | Acmebot Function App on Windows Y1 [Consumption plan](https://azure.microsoft.com/en-us/pricing/details/functions/) (no fixed cost — invoked ~once per cert per 60 days), one Standard LRS [Storage Account](https://azure.microsoft.com/en-us/pricing/details/storage/files/) for function state, one [App Insights](https://azure.microsoft.com/en-us/pricing/details/monitor/) workspace, one user-assigned MI for AppGW. Public Let's Encrypt certs are free. | **< $1** (storage + minimal AI ingest) |
-| `existing_vnet = { ... }` (Mode B) | Skips the NAT Gateway, shared route table, and shared NSG owned by this template — outbound NAT becomes your VNet's responsibility. | **−~$32.85** (saves NAT Gateway) |
+| `custom_domain = "<fqdn>"` | Binds a custom domain to the Container App's external ingress with a free [ACA managed certificate](https://learn.microsoft.com/en-us/azure/container-apps/custom-domains-managed-certificates) (DigiCert-issued, ~6-month, auto-renewing). No extra Azure resources. | **$0** (managed cert is free) |
+| `existing_vnet = { ... }` (Mode B) | Skips the NAT Gateway owned by this template — outbound NAT becomes your VNet's responsibility. | **−~$32.85** (saves NAT Gateway) |
 
 ## Scaling levers
 
 How the numeric inputs in `variables.tf` move the cost lines above:
 
-- **`martini_node_count = N`** (runtime mode only) — multiplies the [Container Instances](https://azure.microsoft.com/en-us/pricing/details/container-instances/) line by `N`. At defaults that's ≈ **+$72/month per extra replica**.
-- **`martini_cpu` / `martini_memory`** — ACI is billed per vCPU-second and per GB-second. Monthly cost per replica is `(martini_cpu × $0.0405 + martini_memory × $0.00445) × 730`.
+- **`martini_node_count = N`** (runtime mode only) — sets both `min_replicas` and `max_replicas` on the runtime [Container App](https://azure.microsoft.com/en-us/pricing/details/container-apps/), so `N` replicas stay always-active. At defaults that's ≈ **+$72/month per extra replica**.
+- **`martini_cpu` / `martini_memory`** — Container Apps Consumption bills per active vCPU-second and GB-second (with a free monthly grant). Cost scales linearly with both values per always-active replica.
 - **`cassandra_sku`** — list ranges from `Standard_D8s_v5` (**$0.48/h/node**, the default and cheapest accepted SKU) to `Standard_E32s_v5` (**$2.52/h/node**); picking a larger SKU can multiply the Cassandra compute line by up to ~5×.
 - **`cassandra_node_count`** — linear multiplier; minimum 3.
 - **`cassandra_disk_count` / `cassandra_disk_sku`** — each [P30 disk](https://azure.microsoft.com/en-us/pricing/details/managed-disks/) is $135.17/mo; bumping to P40 ($270.34/mo) or adding disks per node multiplies the disk line accordingly.
@@ -66,7 +66,7 @@ How the numeric inputs in `variables.tf` move the cost lines above:
 
 # Bring-your-own VNet (Mode B)
 
-By default the template provisions a fresh VNet plus a NAT gateway, route table, and shared NSG. To deploy into an existing corporate VNet instead, set `existing_vnet` and supply CIDRs for the three workload subnets (`aci`, `appgw`, and — if `enable_cassandra_tracker = true` — `cassandra`):
+By default the template provisions a fresh VNet plus a NAT gateway. To deploy into an existing corporate VNet instead, set `existing_vnet` and supply CIDRs for the workload subnets (`aci`, `aca`, and — if `enable_cassandra_tracker = true` — `cassandra`):
 
 ```hcl
 existing_vnet = {
@@ -75,26 +75,24 @@ existing_vnet = {
 }
 
 aci_subnet_cidr       = "172.16.3.16/28"
-appgw_subnet_cidr     = "172.16.3.64/26"  # /26 minimum for Application Gateway v2
+aca_subnet_cidr       = "172.16.3.64/27"  # /27 minimum for a Container Apps workload-profile environment
 cassandra_subnet_cidr = "172.16.3.192/26" # /26 minimum for Managed Cassandra
 
 # Optional: associate the new ACI / Cassandra subnets with the network team's
-# shared route table and NSG. The Application Gateway subnet always gets a
-# dedicated NSG created by this template.
+# shared route table and NSG.
 byo_vnet_route_table_id  = "/subscriptions/.../routeTables/Route-Dev-Prd"
 byo_vnet_workload_nsg_id = "/subscriptions/.../networkSecurityGroups/nsg-cus-dev-network"
 ```
 
 In Mode B the template:
 
-- creates `azurerm_subnet.aci` (delegated to `Microsoft.ContainerInstance/containerGroups`), `azurerm_subnet.appgw`, and `azurerm_subnet.cassandra` (delegated to `Microsoft.DocumentDB/cassandraClusters`) inside `existing_vnet.name`
-- creates a dedicated NSG for the App Gateway subnet (`AllowAppGatewayInfraPorts` and `AllowClientToAppGateway` inbound)
-- does **not** create a NAT gateway, route table, or shared NSG
+- creates `azurerm_subnet.aci` (delegated to `Microsoft.ContainerInstance/containerGroups`), `azurerm_subnet.aca` (delegated to `Microsoft.App/environments`), and `azurerm_subnet.cassandra` (delegated to `Microsoft.DocumentDB/cassandraClusters`) inside `existing_vnet.name`
+- does **not** create a NAT gateway — outbound NAT is your VNet's responsibility
 
 The Terraform principal must hold `Microsoft.Network/virtualNetworks/subnets/write` on the existing VNet. Two caveats worth checking with whoever owns that VNet:
 
 - their VNet's Terraform must not declare inline `subnet { ... }` blocks on `azurerm_virtual_network` (this would delete our subnets on their next apply); they should manage subnets via standalone `azurerm_subnet` resources or `lifecycle { ignore_changes = [subnet] }`.
-- if you set `byo_vnet_workload_nsg_id` to a shared NSG, that NSG's existing rules must permit traffic from the AppGW subnet CIDR to the ACI subnet on the Designer/Runtime port (`8080` or `3000`); otherwise AppGW health probes fail. Leaving `byo_vnet_workload_nsg_id = null` keeps the ACI subnet on Azure's default `AllowVnetInBound`, which already covers this.
+- the Container Apps environment is reached over the public internet via its external ingress, so the `aca` subnet only needs outbound access for the workload. Leaving `byo_vnet_workload_nsg_id = null` keeps the subnets on Azure's default rules, which already cover this.
 
 # Uses external modules
 
@@ -242,58 +240,36 @@ The same values are also written to Key Vault as the `smtp-host`, `smtp-port`, `
 
 Set `enable_communication_services_email = false` to skip the entire stack (no Entra app, no Communication Services resource, no Key Vault secrets, no env vars). Defaults to `true` because most Martini deployments want outbound mail and the cost at quota is effectively $0.
 
-# Custom domain TLS via Acmebot + Application Gateway
+# Custom domain TLS via ACA managed certificates
 
-Setting `custom_domain = "<fqdn>"` (e.g. `cooper.external.lonti.com`) provisions a fully-automated Let's Encrypt cert pipeline and wires it into the Application Gateway's HTTPS listener. Leaving `custom_domain = ""` (the default) skips the entire stack and AppGW falls back to the self-signed cert generated in-Terraform.
+Setting `custom_domain = "<fqdn>"` (e.g. `cooper.external.lonti.com`) binds the FQDN to the Container App's external ingress and issues a **free [Azure-managed certificate](https://learn.microsoft.com/en-us/azure/container-apps/custom-domains-managed-certificates)** (DigiCert-issued, ~6-month validity, auto-renewing). There is no Application Gateway, Key Vault cert, Acmebot Function App, or helper script — Azure manages the certificate lifecycle. Leaving `custom_domain = ""` (the default) leaves the app reachable on its free `*.azurecontainerapps.io` FQDN with Microsoft's auto-managed cert.
 
-## What gets provisioned
+## Why this is a two-phase apply
 
-When `custom_domain != ""`:
+A managed certificate can only be issued after DigiCert validates domain ownership by reaching the app over public DNS, and the DNS records can only be created once the app exists and exposes its verification id — a [chicken-and-egg the azurerm provider does not resolve in one pass](https://github.com/hashicorp/terraform-provider-azurerm/issues/21866). The template handles this with the `custom_domain_dns_ready` gate:
 
-- `module.acmebot` — [`shibayan/keyvault-acmebot/azurerm ~> 3.1`](https://registry.terraform.io/modules/shibayan/keyvault-acmebot/azurerm/latest) (acmebot v4, Windows Function App on Consumption Y1). The Function App's system-assigned MI is granted full cert lifecycle perms on the Key Vault via `azurerm_key_vault_access_policy.acmebot`.
-- `azurerm_user_assigned_identity.appgw_kv` — UAMI consumed by Application Gateway to read the cert at runtime. App Gateway *cannot* use a system-assigned identity for KV cert references — it must be user-assigned. Granted `certificates: Get` + `secrets: Get` via `azurerm_key_vault_access_policy.appgw_kv`.
-- `null_resource.issue_cert` runs `scripts/issue-cert.sh` once per cert: POSTs to `https://<acmebot-function>.azurewebsites.net/api/certificate` with an `x-functions-key` header, then polls Key Vault until the cert lands (10-min ceiling). Idempotent — exits 0 early if the cert already has >30 days of validity left.
-- `data.azurerm_key_vault_certificate.appgw_custom` reads the cert's `versionless_secret_id` and the AppGW HTTPS listener consumes it.
+**Phase 1 — create the app, read the required DNS records.** With `custom_domain` set and `custom_domain_dns_ready = false` (default), apply. The Container App comes up on its `*.azurecontainerapps.io` FQDN, and the `custom_domain_dns_records` output lists exactly what to create:
 
-## DNS wiring
-
-You provide DNS in two places:
-
-1. **For traffic** — point `<custom_domain>` at the AppGW public IP (`app_gw_public_ip` output) with a single A record:
-
-   ```
-   <custom_domain>.   300   IN   A   <app_gw_public_ip>
-   ```
-
-2. **For the ACME DNS-01 challenge** — Acmebot needs API credentials for the zone that contains `<custom_domain>` so it can write/delete `_acme-challenge.<custom_domain>` TXT records itself. The template currently wires `var.acmebot_route53` to the module's `route_53` input — set it to your Route53 IAM access key/secret to use that path. Add other DNS providers (Cloudflare, Google DNS, GoDaddy, etc.) by extending the `module "acmebot"` block in `acmebot.tf`; the upstream module exposes one input per provider.
-
-The cert auto-renews via Acmebot's own scheduler (default: weekly check, renews when <30 days remain). No further Terraform action is needed for renewals.
-
-## Storage Account Key Operator role grant
-
-The Acmebot module reads `primary_access_key` on its storage account, which requires `Microsoft.Storage/storageAccounts/listKeys/action`. Many tenant-scoped role designs grant resource creation but not listKeys. To keep the apply self-contained, `acmebot.tf` adds:
-
-```hcl
-resource "azurerm_role_assignment" "acmebot_user_key_op" {
-  scope                = azurerm_resource_group.rg.id
-  role_definition_name = "Storage Account Key Operator Service Role"
-  principal_id         = data.azurerm_client_config.current.object_id
-}
+```
+terraform output custom_domain_dns_records
 ```
 
-…followed by a 180s `time_sleep` that the `module.acmebot` call `depends_on`. This grants the principal running Terraform listKeys at the RG scope before the new storage account is created. The Terraform principal must already have `Microsoft.Authorization/roleAssignments/write` (Owner or User Access Administrator at RG scope) for this to succeed — Contributor alone is not enough.
+```hcl
+[
+  { name = "cooper.external.lonti.com",       type = "CNAME", value = "cooper-runtime.bluefield-1234.eastus.azurecontainerapps.io" },
+  { name = "asuid.cooper.external.lonti.com", type = "TXT",   value = "ABCD...1234" },
+]
+```
 
-## Key Vault access-policy hygiene
+**Phase 1.5 — create those two records** in whatever zone owns `<custom_domain>`.
 
-The Key Vault uses **standalone** `azurerm_key_vault_access_policy` resources rather than inline `access_policy` blocks on the vault itself. Mixing the two is a footgun: modifying the inline block triggers an `Update` on the vault that overwrites *all* policies, silently wiping the standalone `acmebot` and `appgw_kv` policies. Three policies exist:
+**Phase 2 — issue and bind the cert.** Set `custom_domain_dns_ready = true` and apply again. This creates `azurerm_container_app_environment_managed_certificate` (validated via the CNAME) and binds it to the domain with `SniEnabled` via `azurerm_container_app_custom_domain`. Once issued, Azure auto-renews the cert before expiry — no further Terraform action is needed.
 
-- `azurerm_key_vault_access_policy.deployer` — the Terraform principal; needs `certificates: Get, List` so `scripts/issue-cert.sh` can poll KV.
-- `azurerm_key_vault_access_policy.acmebot` (gated on `custom_domain != ""`) — Acmebot MI; full cert lifecycle.
-- `azurerm_key_vault_access_policy.appgw_kv` (gated on `custom_domain != ""`) — AppGW UAMI; read-only.
+## Limitations vs the previous Acmebot pipeline
 
-## Why v4 (not v5)
-
-Acmebot v5 requires Microsoft Entra ID authentication on the Function App (Easy Auth + an app registration). The template's `scripts/issue-cert.sh` uses `x-functions-key` auth, which v5 rejects. v4 accepts function keys directly, which keeps the workflow self-contained — no extra Entra app, no client secret rotation, no token-acquisition logic in the script. If you later need v5's RBAC story, swap the module call back to the v5-targeting source (`shibayan/keyvault-acmebot/azurerm ~> 4.0` or the vendored `polymind-inc` fork) and rewrite `issue-cert.sh` to obtain a bearer token via `az account get-access-token --resource <client_id>`.
+- **Single hostname only.** ACA managed certificates do not support wildcard (`*.example.com`) or multi-SAN certs. Each `custom_domain` binds exactly one FQDN. (The Acmebot/Let's Encrypt path this replaced could do wildcards via DNS-01; if you ever need that, you must reintroduce a self-managed cert pipeline.)
+- **App must be publicly reachable.** DigiCert validates by reaching the public FQDN, so managed certs are incompatible with internal-only environments or apps fronted by a gateway. This template's environment is external by design (`internal_load_balancer_enabled = false`).
+- **No static inbound IP.** Clients resolve the ACA ingress FQDN (a shared, non-contractually-stable IP). If a consumer needs to allowlist a fixed ingress IP, this template no longer provides one.
 
 # Precommit checks
 
@@ -326,7 +302,6 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="provider_azuread"></a> [azuread](#provider\_azuread) | 3.8.0 |
 | <a name="provider_azurerm"></a> [azurerm](#provider\_azurerm) | 4.73.0 |
 | <a name="provider_local"></a> [local](#provider\_local) | 2.9.0 |
-| <a name="provider_null"></a> [null](#provider\_null) | 3.3.0 |
 | <a name="provider_random"></a> [random](#provider\_random) | 3.9.0 |
 | <a name="provider_terraform"></a> [terraform](#provider\_terraform) | n/a |
 | <a name="provider_time"></a> [time](#provider\_time) | 0.14.0 |
@@ -335,11 +310,7 @@ run a few checks before the commit. The checks used are (in order of execution):
 
 | Name | Source | Version |
 |------|--------|---------|
-| <a name="module_acmebot"></a> [acmebot](#module\_acmebot) | shibayan/keyvault-acmebot/azurerm | ~> 3.1 |
-| <a name="module_app_gw"></a> [app\_gw](#module\_app\_gw) | Azure/avm-res-network-applicationgateway/azurerm | ~> 0.4.2 |
 | <a name="module_nat_gw"></a> [nat\_gw](#module\_nat\_gw) | Azure/avm-res-network-natgateway/azurerm | ~> 0.2.1 |
-| <a name="module_network_sg"></a> [network\_sg](#module\_network\_sg) | Azure/avm-res-network-networksecuritygroup/azurerm | ~> 0.5.0 |
-| <a name="module_route_table"></a> [route\_table](#module\_route\_table) | Azure/avm-res-network-routetable/azurerm | ~> 0.4.1 |
 | <a name="module_sql_server"></a> [sql\_server](#module\_sql\_server) | Azure/avm-res-sql-server/azurerm | ~> 0.1.5 |
 | <a name="module_virtual_network"></a> [virtual\_network](#module\_virtual\_network) | Azure/avm-res-network-virtualnetwork/azurerm | ~> 0.9.3 |
 
@@ -355,7 +326,7 @@ run a few checks before the commit. The checks used are (in order of execution):
 | [azurerm_container_app_custom_domain.martini](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_app_custom_domain) | resource |
 | [azurerm_container_app_custom_domain.martini_designer](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_app_custom_domain) | resource |
 | [azurerm_container_app_environment.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_app_environment) | resource |
-| [azurerm_container_app_environment_certificate.custom](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_app_environment_certificate) | resource |
+| [azurerm_container_app_environment_managed_certificate.custom](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_app_environment_managed_certificate) | resource |
 | [azurerm_container_app_environment_storage.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_app_environment_storage) | resource |
 | [azurerm_container_registry.ecr_mirror](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_registry) | resource |
 | [azurerm_container_registry_scope_map.designer_pull](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/container_registry_scope_map) | resource |
@@ -370,8 +341,6 @@ run a few checks before the commit. The checks used are (in order of execution):
 | [azurerm_eventhub_namespace.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/eventhub_namespace) | resource |
 | [azurerm_eventhub_namespace_authorization_rule.martini_listener](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/eventhub_namespace_authorization_rule) | resource |
 | [azurerm_key_vault.key_vault](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault) | resource |
-| [azurerm_key_vault_access_policy.acmebot](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_access_policy) | resource |
-| [azurerm_key_vault_access_policy.appgw_kv](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_access_policy) | resource |
 | [azurerm_key_vault_access_policy.deployer](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_access_policy) | resource |
 | [azurerm_key_vault_secret.cassandra_admin_password](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
 | [azurerm_key_vault_secret.cassandra_contact_point](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/key_vault_secret) | resource |
@@ -389,25 +358,22 @@ run a few checks before the commit. The checks used are (in order of execution):
 | [azurerm_log_analytics_workspace.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/log_analytics_workspace) | resource |
 | [azurerm_monitor_action_group.ops](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_action_group) | resource |
 | [azurerm_monitor_activity_log_alert.aca_terminations](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_activity_log_alert) | resource |
-| [azurerm_monitor_diagnostic_setting.app_gw](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_diagnostic_setting) | resource |
 | [azurerm_monitor_diagnostic_setting.conf_file](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_diagnostic_setting) | resource |
 | [azurerm_monitor_metric_alert.aca_memory_high](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_metric_alert) | resource |
-| [azurerm_monitor_metric_alert.app_gw_5xx_burst](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_metric_alert) | resource |
-| [azurerm_monitor_metric_alert.app_gw_failed_requests](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_metric_alert) | resource |
-| [azurerm_monitor_metric_alert.app_gw_unhealthy_hosts](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_metric_alert) | resource |
 | [azurerm_monitor_metric_alert.storage_availability](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_metric_alert) | resource |
 | [azurerm_monitor_metric_alert.storage_e2e_latency](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_metric_alert) | resource |
 | [azurerm_monitor_scheduled_query_rules_alert_v2.storage_throttling](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/monitor_scheduled_query_rules_alert_v2) | resource |
-| [azurerm_network_security_group.appgw](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/network_security_group) | resource |
-| [azurerm_public_ip.app_gw_pip](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/public_ip) | resource |
+| [azurerm_nat_gateway.aca](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/nat_gateway) | resource |
+| [azurerm_nat_gateway_public_ip_association.aca](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/nat_gateway_public_ip_association) | resource |
+| [azurerm_public_ip.aca_nat](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/public_ip) | resource |
 | [azurerm_resource_group.rg](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
 | [azurerm_resource_provider_registration.communication](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_provider_registration) | resource |
-| [azurerm_role_assignment.acmebot_user_key_op](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.acs_smtp_email_owner](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.cassandra_cosmos_db_subnet_join](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.ces_azure_sql_to_eh](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.martini_designer_eh_receiver](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.martini_runtime_eh_receiver](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
+| [azurerm_route_table.aca](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/route_table) | resource |
 | [azurerm_storage_account.conf](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account) | resource |
 | [azurerm_storage_share.db_pool](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_share) | resource |
 | [azurerm_storage_share.designer_workspace_data](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_share) | resource |
@@ -422,27 +388,23 @@ run a few checks before the commit. The checks used are (in order of execution):
 | [azurerm_storage_share_file.tracker_dbxml](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_share_file) | resource |
 | [azurerm_subnet.aca](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) | resource |
 | [azurerm_subnet.aci](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) | resource |
-| [azurerm_subnet.appgw](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) | resource |
 | [azurerm_subnet.cassandra](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet) | resource |
+| [azurerm_subnet_nat_gateway_association.aca](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet_nat_gateway_association) | resource |
 | [azurerm_subnet_network_security_group_association.aca](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet_network_security_group_association) | resource |
 | [azurerm_subnet_network_security_group_association.aci](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet_network_security_group_association) | resource |
-| [azurerm_subnet_network_security_group_association.appgw](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet_network_security_group_association) | resource |
 | [azurerm_subnet_network_security_group_association.cassandra](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet_network_security_group_association) | resource |
 | [azurerm_subnet_route_table_association.aca](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet_route_table_association) | resource |
 | [azurerm_subnet_route_table_association.aci](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet_route_table_association) | resource |
 | [azurerm_subnet_route_table_association.cassandra](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/subnet_route_table_association) | resource |
-| [azurerm_user_assigned_identity.appgw_kv](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity) | resource |
 | [local_file.designer_version](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [local_file.tracker_dbxml](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
-| [null_resource.issue_cert](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [random_password.admin_password](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_password.cassandra_admin](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/password) | resource |
 | [random_string.ecr_acr_suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [random_string.kv_suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
-| [random_string.pip_dns_suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [random_string.storage_suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
+| [terraform_data.bind_custom_domain](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
 | [terraform_data.ecr_image_import](https://registry.terraform.io/providers/hashicorp/terraform/latest/docs/resources/data) | resource |
-| [time_sleep.acmebot_user_key_op_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [time_sleep.acs_smtp_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [time_sleep.ces_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
 | [time_sleep.martini_eh_role_propagation](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
@@ -451,8 +413,6 @@ run a few checks before the commit. The checks used are (in order of execution):
 | [aws_ecr_authorization_token.designer](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/ecr_authorization_token) | data source |
 | [azuread_service_principal.cosmos_db](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/data-sources/service_principal) | data source |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
-| [azurerm_key_vault_certificate.appgw_custom](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_certificate) | data source |
-| [azurerm_key_vault_secret.appgw_custom_pfx](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/key_vault_secret) | data source |
 | [azurerm_mssql_server.ces_source](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/mssql_server) | data source |
 | [azurerm_virtual_network.existing](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/virtual_network) | data source |
 
@@ -462,13 +422,9 @@ run a few checks before the commit. The checks used are (in order of execution):
 |------|-------------|------|---------|:--------:|
 | <a name="input_aca_subnet_cidr"></a> [aca\_subnet\_cidr](#input\_aca\_subnet\_cidr) | CIDR for the Azure Container Apps delegated subnet. Minimum /27 (32 IPs) for a Workload Profile environment. Required when existing\_vnet is set; in Mode A the subnet is created from this CIDR via the AVM module. | `string` | `null` | no |
 | <a name="input_aci_subnet_cidr"></a> [aci\_subnet\_cidr](#input\_aci\_subnet\_cidr) | CIDR for the ACI delegated subnet inside the existing VNet. Required when existing\_vnet is set; ignored otherwise. | `string` | `null` | no |
-| <a name="input_acme_contact_email"></a> [acme\_contact\_email](#input\_acme\_contact\_email) | Contact email registered with the ACME account used by keyvault-acmebot. Required when custom\_domain is set. Let's Encrypt sends expiry warnings here. | `string` | `""` | no |
-| <a name="input_acme_endpoint"></a> [acme\_endpoint](#input\_acme\_endpoint) | ACME directory URL used by keyvault-acmebot. Defaults to the Let's Encrypt staging directory so the first apply produces a non-rate-limited STAGING cert. Flip to https://acme-v02.api.letsencrypt.org/directory for production issuance — issue-cert.sh detects the staging↔prod issuer mismatch and forces re-issuance automatically; no manual KV purge needed. | `string` | `"https://acme-staging-v02.api.letsencrypt.org/directory"` | no |
-| <a name="input_acmebot_route53"></a> [acmebot\_route53](#input\_acmebot\_route53) | AWS Route53 credentials passed to the Acmebot Function App as application settings. The IAM principal needs route53:ListHostedZones, route53:GetChange, and route53:ChangeResourceRecordSets on the hosted zone covering custom\_domain. Required when custom\_domain is set. Not consumed by an AWS provider — there is no AWS provider in this repo. | <pre>object({<br/>    access_key = string<br/>    secret_key = string<br/>    region     = string<br/>  })</pre> | `null` | no |
 | <a name="input_alert_emails"></a> [alert\_emails](#input\_alert\_emails) | List of email addresses that receive every alert fired by the action group. Each address becomes a separate email\_receiver. Leave empty to provision the action group with no receivers (alerts still fire but go nowhere). | `list(string)` | `[]` | no |
-| <a name="input_appgw_subnet_cidr"></a> [appgw\_subnet\_cidr](#input\_appgw\_subnet\_cidr) | CIDR for the Application Gateway dedicated subnet inside the existing VNet (/26 or larger recommended for v2). Required when existing\_vnet is set; ignored otherwise. | `string` | `null` | no |
 | <a name="input_byo_vnet_route_table_id"></a> [byo\_vnet\_route\_table\_id](#input\_byo\_vnet\_route\_table\_id) | Optional ID of a pre-existing route table to associate with the ACI and Cassandra subnets when existing\_vnet is set. Leave null to use Azure system routes. Ignored when existing\_vnet is null. | `string` | `null` | no |
-| <a name="input_byo_vnet_workload_nsg_id"></a> [byo\_vnet\_workload\_nsg\_id](#input\_byo\_vnet\_workload\_nsg\_id) | Optional ID of a pre-existing NSG to associate with the ACI and Cassandra subnets when existing\_vnet is set. The Application Gateway subnet always gets a dedicated NSG created by this template. Ignored when existing\_vnet is null. | `string` | `null` | no |
+| <a name="input_byo_vnet_workload_nsg_id"></a> [byo\_vnet\_workload\_nsg\_id](#input\_byo\_vnet\_workload\_nsg\_id) | Optional ID of a pre-existing NSG to associate with the ACI and Cassandra subnets when existing\_vnet is set. Ignored when existing\_vnet is null. | `string` | `null` | no |
 | <a name="input_cassandra_disk_count"></a> [cassandra\_disk\_count](#input\_cassandra\_disk\_count) | Number of premium managed disks attached to each Cassandra node. Valid only if `enable_cassandra_tracker` is set to `true`. | `number` | `4` | no |
 | <a name="input_cassandra_disk_sku"></a> [cassandra\_disk\_sku](#input\_cassandra\_disk\_sku) | Premium disk SKU for each Cassandra node disk (e.g. `P30`, `P40`). Valid only if `enable_cassandra_tracker` is set to `true`. | `string` | `"P30"` | no |
 | <a name="input_cassandra_node_count"></a> [cassandra\_node\_count](#input\_cassandra\_node\_count) | Number of Cassandra nodes per data center. Azure Managed Instance for Apache Cassandra requires at least 3. Valid only if `enable_cassandra_tracker` is set to `true`. | `number` | `3` | no |
@@ -478,7 +434,8 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="input_ces_source_sql_server"></a> [ces\_source\_sql\_server](#input\_ces\_source\_sql\_server) | Azure SQL Server (in the same subscription) whose system-assigned managed identity is granted `Azure Event Hubs Data Sender` on each hub. The server must already exist at apply time and have system-assigned MI enabled. Set to `null` to fall back to the local `module.sql_server` (when `enable_sql_server = true`) or to skip the role assignment entirely. Valid only if `enable_event_hub` is set to `true`. | <pre>object({<br/>    name                = string<br/>    resource_group_name = string<br/>  })</pre> | `null` | no |
 | <a name="input_communication_email_sender_username"></a> [communication\_email\_sender\_username](#input\_communication\_email\_sender\_username) | Identifier used for both (a) the ACS SMTP Username resource (SMTP AUTH login string) and (b) the local-part of the sender address on the Azure-managed domain. Default `martini` yields `martini` as the SMTP login and `martini@<random>.azurecomm.net` as the From address. Valid only if `enable_communication_services_email` is set to `true`. | `string` | `"martini"` | no |
 | <a name="input_communication_email_smtp_entra_app"></a> [communication\_email\_smtp\_entra\_app](#input\_communication\_email\_smtp\_entra\_app) | Existing Microsoft Entra application used as the SMTP authentication principal against the Communication Services resource. Have your tenant admin create the app (Application Developer is sufficient) in the same tenant as the subscription, then capture: `client_id` (Application (client) ID), `sp_object_id` (Enterprise Application → Object ID, NOT the app registration Object ID), and `client_secret` (value of a client secret you generated on the app). Required when `enable_communication_services_email = true`. | <pre>object({<br/>    client_id     = string<br/>    sp_object_id  = string<br/>    client_secret = string<br/>  })</pre> | `null` | no |
-| <a name="input_custom_domain"></a> [custom\_domain](#input\_custom\_domain) | Public FQDN to bind to the Application Gateway via a second SNI listener (e.g. cooper.external.lonti.com). When empty, the Acmebot Function App, the Key Vault access policies for it, and the second HTTPS listener are all skipped. The A record for this hostname is created manually in DNS — Acmebot only manages the DNS-01 TXT records during issuance. | `string` | `""` | no |
+| <a name="input_custom_domain"></a> [custom\_domain](#input\_custom\_domain) | Public FQDN to bind to the Container App's external ingress (e.g. cooper.external.lonti.com). When empty, the app is reachable only on its free *.azurecontainerapps.io FQDN with Microsoft's auto-managed certificate, and no custom-domain or certificate resources are created. Binding a custom domain is a two-phase apply — see custom\_domain\_dns\_ready. | `string` | `""` | no |
+| <a name="input_custom_domain_dns_ready"></a> [custom\_domain\_dns\_ready](#input\_custom\_domain\_dns\_ready) | Two-phase-apply gate for binding custom\_domain. Leave false on the first<br/>apply: the Container App is created and the custom\_domain\_dns\_records output<br/>lists the CNAME + asuid TXT records to create. Create those records, then set<br/>this true and re-apply. The second apply issues the free DigiCert managed<br/>certificate (validated by DigiCert reaching the public FQDN) and binds it to<br/>the domain via SNI. Ignored when custom\_domain is empty. | `bool` | `false` | no |
 | <a name="input_docker_registry_password"></a> [docker\_registry\_password](#input\_docker\_registry\_password) | Docker Hub access token (preferred) or password paired with `docker_registry_username`. | `string` | `""` | no |
 | <a name="input_docker_registry_username"></a> [docker\_registry\_username](#input\_docker\_registry\_username) | Docker Hub username used to authenticate image pulls and avoid anonymous rate limits. Leave empty to pull anonymously. | `string` | `""` | no |
 | <a name="input_ecr_source_credentials"></a> [ecr\_source\_credentials](#input\_ecr\_source\_credentials) | Private AWS ECR source for the Martini Designer image. When set, an Azure Container Registry is provisioned as a pull-through cache and the Designer ACI pulls from there instead of Docker Hub. Leave null to use the public Docker Hub image. | <pre>object({<br/>    account_id = string<br/>    region     = string<br/>    access_key = string<br/>    secret_key = string<br/>    repository = optional(string, "lontiplatform/martini-designer-online")<br/>  })</pre> | `null` | no |
@@ -491,17 +448,16 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="input_event_hub_capacity"></a> [event\_hub\_capacity](#input\_event\_hub\_capacity) | Throughput units (Standard) or processing units (Premium) for the namespace. Ignored for Basic. Valid only if `enable_event_hub` is set to `true`. | `number` | `1` | no |
 | <a name="input_event_hub_namespace_sku"></a> [event\_hub\_namespace\_sku](#input\_event\_hub\_namespace\_sku) | SKU tier for the Event Hubs namespace. Must be `Standard` or higher for Martini's Kafka-protocol CES consumer — Basic-tier namespaces do not expose port 9093. Valid only if `enable_event_hub` is set to `true`. | `string` | `"Standard"` | no |
 | <a name="input_event_hubs"></a> [event\_hubs](#input\_event\_hubs) | Event Hub instances to create on the namespace, keyed by name. Each entry sets `partition_count` and `message_retention` (days). Each hub receives an `Azure Event Hubs Data Sender` grant for the resolved CES source identity (see `ces_source_sql_server`), if any. Valid only if `enable_event_hub` is set to `true`. | <pre>map(object({<br/>    partition_count   = number<br/>    message_retention = number<br/>  }))</pre> | `{}` | no |
-| <a name="input_existing_vnet"></a> [existing\_vnet](#input\_existing\_vnet) | Reference to a pre-existing VNet to deploy workload subnets into. When set,<br/>the template skips creating its own VNet/NAT/route-table/shared NSG and<br/>instead creates the per-workload subnets (ACI, App Gateway, and — when<br/>enable\_cassandra\_tracker = true — Cassandra MI) directly inside the named<br/>VNet via azurerm\_subnet. The Terraform principal must hold<br/>Microsoft.Network/virtualNetworks/subnets/write on the VNet.<br/><br/>When null (default), the template creates a brand-new VNet plus NAT gateway,<br/>route table, and shared NSG using vnet\_address\_space / public\_subnet\_cidrs /<br/>private\_subnet\_cidrs / cassandra\_subnet\_cidr (current behaviour, preserved). | <pre>object({<br/>    name                = string<br/>    resource_group_name = string<br/>  })</pre> | `null` | no |
+| <a name="input_existing_vnet"></a> [existing\_vnet](#input\_existing\_vnet) | Reference to a pre-existing VNet to deploy workload subnets into. When set,<br/>the template skips creating its own VNet/NAT gateway and instead creates the<br/>per-workload subnets (ACI, Container Apps, and — when<br/>enable\_cassandra\_tracker = true — Cassandra MI) directly inside the named<br/>VNet via azurerm\_subnet. The Terraform principal must hold<br/>Microsoft.Network/virtualNetworks/subnets/write on the VNet.<br/><br/>When null (default), the template creates a brand-new VNet plus a NAT gateway<br/>using vnet\_address\_space / private\_subnet\_cidrs / aca\_subnet\_cidr /<br/>cassandra\_subnet\_cidr (current behaviour, preserved). | <pre>object({<br/>    name                = string<br/>    resource_group_name = string<br/>  })</pre> | `null` | no |
 | <a name="input_martini_cpu"></a> [martini\_cpu](#input\_martini\_cpu) | Number of CPU cores to allocate for the application. | `number` | `2` | no |
 | <a name="input_martini_home_path"></a> [martini\_home\_path](#input\_martini\_home\_path) | Path to the Martini workspace inside the container image. Default matches the official lontiplatform/martini-server-runtime image. | `string` | `"/data"` | no |
 | <a name="input_martini_memory"></a> [martini\_memory](#input\_martini\_memory) | Amount of memory (in GB) to allocate for the application | `number` | `4` | no |
-| <a name="input_martini_node_count"></a> [martini\_node\_count](#input\_martini\_node\_count) | Number of Martini container instances to run behind the Application Gateway | `number` | `1` | no |
+| <a name="input_martini_node_count"></a> [martini\_node\_count](#input\_martini\_node\_count) | Number of Martini runtime container app replicas to run. | `number` | `1` | no |
 | <a name="input_martini_premium_share_quota_gb"></a> [martini\_premium\_share\_quota\_gb](#input\_martini\_premium\_share\_quota\_gb) | Provisioned capacity (GiB) applied uniformly to every ACI-mounted Premium FileStorage share. Premium shares bill on provisioned GiB at ~$0.16/GiB-month (LRS, Central US); 100 is the minimum Azure will accept. | `number` | `100` | no |
 | <a name="input_martini_version"></a> [martini\_version](#input\_martini\_version) | Tag of the Martini Docker image to deploy. Applied to the runtime image or the designer image depending on `enable_designer`. | `string` | `"2.7.2"` | no |
 | <a name="input_martini_workspace_license"></a> [martini\_workspace\_license](#input\_martini\_workspace\_license) | Full license text to be used with Martini | `string` | n/a | yes |
 | <a name="input_name_suffix"></a> [name\_suffix](#input\_name\_suffix) | Suffix to add to the resources' names | `string` | `""` | no |
 | <a name="input_private_subnet_cidrs"></a> [private\_subnet\_cidrs](#input\_private\_subnet\_cidrs) | Mode A only — ignored when existing\_vnet is set. A list of prefixes for private subnets. | `list(string)` | <pre>[<br/>  "10.0.11.0/24",<br/>  "10.0.12.0/24"<br/>]</pre> | no |
-| <a name="input_public_subnet_cidrs"></a> [public\_subnet\_cidrs](#input\_public\_subnet\_cidrs) | Mode A only — ignored when existing\_vnet is set. A list of prefixes for public subnets. | `list(string)` | <pre>[<br/>  "10.0.1.0/24",<br/>  "10.0.2.0/24"<br/>]</pre> | no |
 | <a name="input_rg_location"></a> [rg\_location](#input\_rg\_location) | Azure region to deploy resources into | `string` | n/a | yes |
 | <a name="input_sql_database_name"></a> [sql\_database\_name](#input\_sql\_database\_name) | Name of the SQL database. Valid only if `enable_sql_server` is set to `true` | `string` | `"martini"` | no |
 | <a name="input_sql_max_size_gb"></a> [sql\_max\_size\_gb](#input\_sql\_max\_size\_gb) | The max size of the database in gigabytes. | `number` | `50` | no |
@@ -514,10 +470,6 @@ run a few checks before the commit. The checks used are (in order of execution):
 
 | Name | Description |
 |------|-------------|
-| <a name="output_acmebot_function_host"></a> [acmebot\_function\_host](#output\_acmebot\_function\_host) | Default hostname of the keyvault-acmebot Function App. Useful for operator debugging (e.g. log tail, manual /api/certificate POSTs). |
-| <a name="output_acmebot_function_key"></a> [acmebot\_function\_key](#output\_acmebot\_function\_key) | Default Functions API key for the keyvault-acmebot Function App. Required for any manual call to /api/certificate. |
-| <a name="output_app_gw_public_ip"></a> [app\_gw\_public\_ip](#output\_app\_gw\_public\_ip) | n/a |
-| <a name="output_app_gw_url"></a> [app\_gw\_url](#output\_app\_gw\_url) | n/a |
 | <a name="output_cassandra_cluster_name"></a> [cassandra\_cluster\_name](#output\_cassandra\_cluster\_name) | n/a |
 | <a name="output_cassandra_contact_point"></a> [cassandra\_contact\_point](#output\_cassandra\_contact\_point) | n/a |
 | <a name="output_cassandra_port"></a> [cassandra\_port](#output\_cassandra\_port) | n/a |
@@ -525,12 +477,14 @@ run a few checks before the commit. The checks used are (in order of execution):
 | <a name="output_communication_services_sender_address"></a> [communication\_services\_sender\_address](#output\_communication\_services\_sender\_address) | n/a |
 | <a name="output_communication_services_smtp_host"></a> [communication\_services\_smtp\_host](#output\_communication\_services\_smtp\_host) | n/a |
 | <a name="output_communication_services_smtp_port"></a> [communication\_services\_smtp\_port](#output\_communication\_services\_smtp\_port) | n/a |
-| <a name="output_custom_domain_url"></a> [custom\_domain\_url](#output\_custom\_domain\_url) | Public HTTPS URL of the custom-domain listener once the A record for var.custom\_domain is pointed at app\_gw\_public\_ip. |
+| <a name="output_custom_domain_dns_records"></a> [custom\_domain\_dns\_records](#output\_custom\_domain\_dns\_records) | The exact DNS records to create in the zone that owns custom\_domain, then set custom\_domain\_dns\_ready = true and re-apply. Null when custom\_domain is empty. |
+| <a name="output_custom_domain_url"></a> [custom\_domain\_url](#output\_custom\_domain\_url) | Public HTTPS URL of the custom domain once the CNAME + asuid TXT records are in place and custom\_domain\_dns\_ready = true has issued and bound the managed certificate. |
 | <a name="output_event_hub_names"></a> [event\_hub\_names](#output\_event\_hub\_names) | n/a |
 | <a name="output_event_hub_namespace_fqdn"></a> [event\_hub\_namespace\_fqdn](#output\_event\_hub\_namespace\_fqdn) | n/a |
 | <a name="output_event_hub_namespace_name"></a> [event\_hub\_namespace\_name](#output\_event\_hub\_namespace\_name) | n/a |
 | <a name="output_log_analytics_workspace_id"></a> [log\_analytics\_workspace\_id](#output\_log\_analytics\_workspace\_id) | n/a |
 | <a name="output_log_analytics_workspace_name"></a> [log\_analytics\_workspace\_name](#output\_log\_analytics\_workspace\_name) | n/a |
+| <a name="output_martini_ingress_fqdn"></a> [martini\_ingress\_fqdn](#output\_martini\_ingress\_fqdn) | Default *.azurecontainerapps.io FQDN of the Martini app's external ingress (the app's base URL when no custom domain is bound). |
 | <a name="output_resource_group_location"></a> [resource\_group\_location](#output\_resource\_group\_location) | n/a |
 | <a name="output_resource_group_name"></a> [resource\_group\_name](#output\_resource\_group\_name) | n/a |
 | <a name="output_subnet_prefixes"></a> [subnet\_prefixes](#output\_subnet\_prefixes) | n/a |

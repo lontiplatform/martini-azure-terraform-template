@@ -93,7 +93,7 @@ variable "martini_memory" {
 }
 
 variable "martini_node_count" {
-  description = "Number of Martini container instances to run behind the Application Gateway"
+  description = "Number of Martini runtime container app replicas to run."
   type        = number
   default     = 1
 
@@ -341,15 +341,15 @@ variable "communication_email_smtp_entra_app" {
 variable "existing_vnet" {
   description = <<-EOT
     Reference to a pre-existing VNet to deploy workload subnets into. When set,
-    the template skips creating its own VNet/NAT/route-table/shared NSG and
-    instead creates the per-workload subnets (ACI, App Gateway, and — when
+    the template skips creating its own VNet/NAT gateway and instead creates the
+    per-workload subnets (ACI, Container Apps, and — when
     enable_cassandra_tracker = true — Cassandra MI) directly inside the named
     VNet via azurerm_subnet. The Terraform principal must hold
     Microsoft.Network/virtualNetworks/subnets/write on the VNet.
 
-    When null (default), the template creates a brand-new VNet plus NAT gateway,
-    route table, and shared NSG using vnet_address_space / public_subnet_cidrs /
-    private_subnet_cidrs / cassandra_subnet_cidr (current behaviour, preserved).
+    When null (default), the template creates a brand-new VNet plus a NAT gateway
+    using vnet_address_space / private_subnet_cidrs / aca_subnet_cidr /
+    cassandra_subnet_cidr (current behaviour, preserved).
   EOT
   type = object({
     name                = string
@@ -366,22 +366,6 @@ variable "aci_subnet_cidr" {
   validation {
     condition     = var.aci_subnet_cidr == null || can(cidrhost(var.aci_subnet_cidr, 0))
     error_message = "aci_subnet_cidr must be a valid CIDR block."
-  }
-}
-
-variable "appgw_subnet_cidr" {
-  description = "CIDR for the Application Gateway dedicated subnet inside the existing VNet (/26 or larger recommended for v2). Required when existing_vnet is set; ignored otherwise."
-  type        = string
-  default     = null
-
-  validation {
-    condition     = var.appgw_subnet_cidr == null || can(cidrhost(var.appgw_subnet_cidr, 0))
-    error_message = "appgw_subnet_cidr must be a valid CIDR block."
-  }
-
-  validation {
-    condition     = var.appgw_subnet_cidr == null || tonumber(regex("/(\\d+)$", var.appgw_subnet_cidr)[0]) <= 26
-    error_message = "appgw_subnet_cidr prefix length must be /26 or larger (prefix number <= 26)."
   }
 }
 
@@ -408,7 +392,7 @@ variable "byo_vnet_route_table_id" {
 }
 
 variable "byo_vnet_workload_nsg_id" {
-  description = "Optional ID of a pre-existing NSG to associate with the ACI and Cassandra subnets when existing_vnet is set. The Application Gateway subnet always gets a dedicated NSG created by this template. Ignored when existing_vnet is null."
+  description = "Optional ID of a pre-existing NSG to associate with the ACI and Cassandra subnets when existing_vnet is set. Ignored when existing_vnet is null."
   type        = string
   default     = null
 }
@@ -419,63 +403,29 @@ variable "vnet_address_space" {
   default     = ["10.0.0.0/18"]
 }
 
-variable "public_subnet_cidrs" {
-  description = "Mode A only — ignored when existing_vnet is set. A list of prefixes for public subnets."
-  type        = list(string)
-  default     = ["10.0.1.0/24", "10.0.2.0/24"]
-}
-
 variable "private_subnet_cidrs" {
   description = "Mode A only — ignored when existing_vnet is set. A list of prefixes for private subnets."
   type        = list(string)
   default     = ["10.0.11.0/24", "10.0.12.0/24"]
 }
 
-// Custom domain / ACME (keyvault-acmebot) configuration
+// Custom domain / TLS configuration
 variable "custom_domain" {
-  description = "Public FQDN to bind to the Application Gateway via a second SNI listener (e.g. cooper.external.lonti.com). When empty, the Acmebot Function App, the Key Vault access policies for it, and the second HTTPS listener are all skipped. The A record for this hostname is created manually in DNS — Acmebot only manages the DNS-01 TXT records during issuance."
+  description = "Public FQDN to bind to the Container App's external ingress (e.g. cooper.external.lonti.com). When empty, the app is reachable only on its free *.azurecontainerapps.io FQDN with Microsoft's auto-managed certificate, and no custom-domain or certificate resources are created. Binding a custom domain is a two-phase apply — see custom_domain_dns_ready."
   type        = string
   default     = ""
 }
 
-variable "acme_contact_email" {
-  description = "Contact email registered with the ACME account used by keyvault-acmebot. Required when custom_domain is set. Let's Encrypt sends expiry warnings here."
-  type        = string
-  default     = ""
-
-  validation {
-    condition     = var.acme_contact_email == "" || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.acme_contact_email))
-    error_message = "acme_contact_email must be a valid email address or empty."
-  }
-}
-
-variable "acme_endpoint" {
-  description = "ACME directory URL used by keyvault-acmebot. Defaults to the Let's Encrypt staging directory so the first apply produces a non-rate-limited STAGING cert. Flip to https://acme-v02.api.letsencrypt.org/directory for production issuance — issue-cert.sh detects the staging↔prod issuer mismatch and forces re-issuance automatically; no manual KV purge needed."
-  type        = string
-  default     = "https://acme-staging-v02.api.letsencrypt.org/directory"
-
-  validation {
-    condition = contains([
-      "https://acme-staging-v02.api.letsencrypt.org/directory",
-      "https://acme-v02.api.letsencrypt.org/directory",
-    ], var.acme_endpoint)
-    error_message = "acme_endpoint must be the Let's Encrypt staging or production directory URL."
-  }
-}
-
-variable "acmebot_route53" {
-  description = "AWS Route53 credentials passed to the Acmebot Function App as application settings. The IAM principal needs route53:ListHostedZones, route53:GetChange, and route53:ChangeResourceRecordSets on the hosted zone covering custom_domain. Required when custom_domain is set. Not consumed by an AWS provider — there is no AWS provider in this repo."
-  type = object({
-    access_key = string
-    secret_key = string
-    region     = string
-  })
-  default   = null
-  sensitive = true
-
-  validation {
-    condition     = var.acmebot_route53 == null || (trimspace(var.acmebot_route53.access_key) != "" && trimspace(var.acmebot_route53.secret_key) != "" && trimspace(var.acmebot_route53.region) != "")
-    error_message = "acmebot_route53.access_key, secret_key, and region must all be non-empty when the object is set."
-  }
+variable "custom_domain_dns_ready" {
+  description = <<-EOT
+    Two-phase-apply gate for binding custom_domain. Leave false on the first
+    apply: the Container App is created and the custom_domain_dns_records output
+    lists the CNAME + asuid TXT records to create. Create those records, then set
+    this true and re-apply. The second apply issues the free DigiCert managed
+    certificate (validated by DigiCert reaching the public FQDN) and binds it to
+    the domain via SNI. Ignored when custom_domain is empty.
+  EOT
+  type        = bool
+  default     = false
 }
 

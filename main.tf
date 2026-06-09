@@ -6,54 +6,22 @@ locals {
     if startswith(k, "private_subnet")
   ]
 
-  aci_subnet_ids = local.byo_vnet ? [azurerm_subnet.aci[0].id] : local.private_subnet_ids
-
   aca_subnet_id = local.byo_vnet ? azurerm_subnet.aca[0].id : module.virtual_network[0].subnets["aca_subnet"].resource.id
-
-  appgw_subnet_id = local.byo_vnet ? azurerm_subnet.appgw[0].id : module.virtual_network[0].subnets["public_subnet1"].resource.id
-
-  appgw_subnet_cidr = local.byo_vnet ? var.appgw_subnet_cidr : module.virtual_network[0].subnets["public_subnet1"].resource.body.properties.addressPrefixes[0]
 
   cassandra_subnet_id = local.byo_vnet ? (var.enable_cassandra_tracker ? azurerm_subnet.cassandra[0].id : null) : (var.enable_cassandra_tracker ? module.virtual_network[0].subnets["cassandra_subnet"].resource.id : null)
 
-  nsg_rules = {
-    "AllowInternetOut" = {
-      name                       = "AllowInternetOut"
-      access                     = "Allow"
-      destination_address_prefix = "*"
-      destination_port_range     = "*"
-      direction                  = "Outbound"
-      priority                   = 200
-      protocol                   = "*"
-      source_address_prefix      = "*"
-      source_port_range          = "*"
-    }
+  custom_domain_enabled = var.custom_domain != ""
 
-    "AllowAppGatewayInfraPorts" = {
-      name                       = "AllowAppGatewayInfraPorts"
-      access                     = "Allow"
-      direction                  = "Inbound"
-      priority                   = 100
-      protocol                   = "Tcp"
-      source_address_prefix      = "GatewayManager"
-      source_port_range          = "*"
-      destination_address_prefix = "*"
-      destination_port_ranges    = ["65200-65535"]
-    }
+  # Phase-2 gate: the managed certificate and SNI binding are only created once
+  # the operator has pointed the CNAME + asuid TXT records at the app (see
+  # var.custom_domain_dns_ready). DigiCert validates domain ownership by reaching
+  # the app's public FQDN, so the records must exist before this flips on.
+  bind_custom_domain = local.custom_domain_enabled && var.custom_domain_dns_ready
 
-    "AllowClientToAppGateway" = {
-      name                       = "AllowClientToAppGateway"
-      access                     = "Allow"
-      direction                  = "Inbound"
-      priority                   = 120
-      protocol                   = "Tcp"
-      source_address_prefix      = "*"
-      source_port_range          = "*"
-      destination_address_prefix = local.appgw_subnet_cidr
-      destination_port_ranges    = ["80", "443"]
-    }
+  martini_app_fqdn = var.enable_designer ? azurerm_container_app.martini_designer[0].ingress[0].fqdn : azurerm_container_app.martini[0].ingress[0].fqdn
 
-  }
+  bound_app_id   = local.bind_custom_domain ? (var.enable_designer ? azurerm_container_app.martini_designer[0].id : azurerm_container_app.martini[0].id) : null
+  bound_app_name = local.bind_custom_domain ? (var.enable_designer ? azurerm_container_app.martini_designer[0].name : azurerm_container_app.martini[0].name) : null
 
   databases = {
     martini = {

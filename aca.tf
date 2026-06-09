@@ -6,7 +6,7 @@ resource "azurerm_container_app_environment" "this" {
   log_analytics_workspace_id = var.enable_log_analytics ? azurerm_log_analytics_workspace.this[0].id : null
 
   infrastructure_subnet_id       = local.aca_subnet_id
-  internal_load_balancer_enabled = true
+  internal_load_balancer_enabled = false
 
   workload_profile {
     name                  = "Consumption"
@@ -129,15 +129,23 @@ resource "azurerm_container_app_environment_storage" "this" {
   access_mode                  = "ReadWrite"
 }
 
-resource "azurerm_container_app_environment_certificate" "custom" {
-  count = local.acmebot_enabled ? 1 : 0
+resource "azurerm_container_app_environment_managed_certificate" "custom" {
+  count = local.bind_custom_domain ? 1 : 0
 
-  name                         = local.custom_cert_name
+  name                         = replace(var.custom_domain, ".", "-")
   container_app_environment_id = azurerm_container_app_environment.this.id
-  certificate_blob_base64      = data.azurerm_key_vault_secret.appgw_custom_pfx[0].value
-  certificate_password         = ""
+  subject_name                 = var.custom_domain
+  domain_control_validation    = "CNAME"
 
   tags = var.tags
+
+  # Azure refuses to issue the managed certificate until the hostname is already
+  # registered on a container app in the environment, so the custom-domain
+  # registration (binding type Disabled) must be created first.
+  depends_on = [
+    azurerm_container_app_custom_domain.martini,
+    azurerm_container_app_custom_domain.martini_designer,
+  ]
 }
 
 resource "azurerm_container_app" "martini" {
@@ -174,7 +182,7 @@ resource "azurerm_container_app" "martini" {
     external_enabled           = true
     target_port                = local.aci_container_port
     transport                  = "auto"
-    allow_insecure_connections = true
+    allow_insecure_connections = false
 
     traffic_weight {
       latest_revision = true
@@ -304,7 +312,7 @@ resource "azurerm_container_app" "martini_designer" {
     external_enabled           = true
     target_port                = local.designer_ui_port
     transport                  = "auto"
-    allow_insecure_connections = true
+    allow_insecure_connections = false
 
     traffic_weight {
       latest_revision = true
@@ -370,19 +378,50 @@ resource "azurerm_container_app" "martini_designer" {
 }
 
 resource "azurerm_container_app_custom_domain" "martini" {
-  count = local.acmebot_enabled && !var.enable_designer ? 1 : 0
+  count = local.bind_custom_domain && !var.enable_designer ? 1 : 0
 
-  name                                     = var.custom_domain
-  container_app_id                         = azurerm_container_app.martini[0].id
-  container_app_environment_certificate_id = azurerm_container_app_environment_certificate.custom[0].id
-  certificate_binding_type                 = "SniEnabled"
+  name             = var.custom_domain
+  container_app_id = azurerm_container_app.martini[0].id
+
+  lifecycle {
+    # Registers the hostname with binding type Disabled; the SNI binding is
+    # applied out-of-band by terraform_data.bind_custom_domain. The cert can't be
+    # referenced here without a cycle — issuing it requires this hostname to exist.
+    ignore_changes = [certificate_binding_type, container_app_environment_certificate_id]
+  }
 }
 
 resource "azurerm_container_app_custom_domain" "martini_designer" {
-  count = local.acmebot_enabled && var.enable_designer ? 1 : 0
+  count = local.bind_custom_domain && var.enable_designer ? 1 : 0
 
-  name                                     = var.custom_domain
-  container_app_id                         = azurerm_container_app.martini_designer[0].id
-  container_app_environment_certificate_id = azurerm_container_app_environment_certificate.custom[0].id
-  certificate_binding_type                 = "SniEnabled"
+  name             = var.custom_domain
+  container_app_id = azurerm_container_app.martini_designer[0].id
+
+  lifecycle {
+    ignore_changes = [certificate_binding_type, container_app_environment_certificate_id]
+  }
+}
+
+# Bind the issued managed certificate to the registered hostname via SNI. This
+# can't be expressed on azurerm_container_app_custom_domain above: referencing
+# the certificate there forms a cycle (cert depends_on the registration). The az
+# CLI does a safe read-modify-write that preserves the rest of the ingress config.
+resource "terraform_data" "bind_custom_domain" {
+  count = local.bind_custom_domain ? 1 : 0
+
+  triggers_replace = {
+    app_id         = local.bound_app_id
+    certificate_id = azurerm_container_app_environment_managed_certificate.custom[0].id
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      az containerapp hostname bind \
+        --resource-group "${azurerm_resource_group.rg.name}" \
+        --name "${local.bound_app_name}" \
+        --hostname "${var.custom_domain}" \
+        --environment "${azurerm_container_app_environment.this.name}" \
+        --certificate "${azurerm_container_app_environment_managed_certificate.custom[0].id}"
+    EOT
+  }
 }

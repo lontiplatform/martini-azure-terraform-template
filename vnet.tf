@@ -11,20 +11,6 @@ module "virtual_network" {
 
   subnets = merge(
     {
-      for i, cidr in var.public_subnet_cidrs :
-      "public_subnet${i + 1}" => {
-        name                            = "${local.name_prefix}-public-subnet-${i + 1}"
-        address_prefixes                = [cidr]
-        default_outbound_access_enabled = true
-        network_security_group = {
-          id = module.network_sg[0].resource_id
-        }
-        route_table = {
-          id = module.route_table[0].resource_id
-        }
-      }
-    },
-    {
       for i, cidr in var.private_subnet_cidrs :
       "private_subnet${i + 1}" => {
         name              = "${local.name_prefix}-private-subnet-${i + 1}"
@@ -79,27 +65,6 @@ module "virtual_network" {
   tags = var.tags
 }
 
-module "route_table" {
-  count = local.byo_vnet ? 0 : 1
-
-  source  = "Azure/avm-res-network-routetable/azurerm"
-  version = "~> 0.4.1"
-
-  name                = "${local.name_prefix}-public-route-table"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  routes = {
-    internet_route = {
-      name           = "${local.name_prefix}-internet-route"
-      address_prefix = "0.0.0.0/0"
-      next_hop_type  = "Internet"
-    }
-  }
-
-  tags = var.tags
-}
-
 module "nat_gw" {
   count = local.byo_vnet ? 0 : 1
 
@@ -116,21 +81,6 @@ module "nat_gw" {
       name = "${local.name_prefix}-nat-gw-public-ip"
     }
   }
-
-  tags = var.tags
-}
-
-module "network_sg" {
-  count = local.byo_vnet ? 0 : 1
-
-  source  = "Azure/avm-res-network-networksecuritygroup/azurerm"
-  version = "~> 0.5.0"
-
-  name                = "${local.name_prefix}-network-sg"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  security_rules = local.nsg_rules
 
   tags = var.tags
 }
@@ -165,22 +115,6 @@ resource "azurerm_subnet" "aci" {
     precondition {
       condition     = var.aci_subnet_cidr != null
       error_message = "aci_subnet_cidr must be set when existing_vnet is non-null."
-    }
-  }
-}
-
-resource "azurerm_subnet" "appgw" {
-  count = local.byo_vnet ? 1 : 0
-
-  name                 = "${local.name_prefix}-appgw"
-  resource_group_name  = var.existing_vnet.resource_group_name
-  virtual_network_name = data.azurerm_virtual_network.existing[0].name
-  address_prefixes     = [var.appgw_subnet_cidr]
-
-  lifecycle {
-    precondition {
-      condition     = var.appgw_subnet_cidr != null
-      error_message = "appgw_subnet_cidr must be set when existing_vnet is non-null."
     }
   }
 }
@@ -233,52 +167,6 @@ resource "azurerm_subnet" "aca" {
   }
 }
 
-# Mode B: AppGW v2 requires GatewayManager 65200-65535 inbound and a 443
-# listener path. In Mode A these rules are carried by module.network_sg
-# attached to the public subnets; in Mode B no shared NSG is created, so we
-# create a dedicated one and attach it only to the AppGW subnet.
-resource "azurerm_network_security_group" "appgw" {
-  #checkov:skip=CKV_AZURE_160:Port 80 is required so AppGW can serve the HTTP→HTTPS redirect rule and ACME HTTP-01 challenge fallback; HTTPS termination still happens on 443.
-  count = local.byo_vnet ? 1 : 0
-
-  name                = "${local.name_prefix}-appgw-nsg"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-
-  security_rule {
-    name                       = "AllowAppGatewayInfraPorts"
-    priority                   = 100
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "65200-65535"
-    source_address_prefix      = "GatewayManager"
-    destination_address_prefix = "*"
-  }
-
-  security_rule {
-    name                       = "AllowClientToAppGateway"
-    priority                   = 120
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_ranges    = ["80", "443"]
-    source_address_prefix      = "*"
-    destination_address_prefix = var.appgw_subnet_cidr
-  }
-
-  tags = var.tags
-}
-
-resource "azurerm_subnet_network_security_group_association" "appgw" {
-  count = local.byo_vnet ? 1 : 0
-
-  subnet_id                 = azurerm_subnet.appgw[0].id
-  network_security_group_id = azurerm_network_security_group.appgw[0].id
-}
-
 resource "azurerm_subnet_route_table_association" "aci" {
   count = local.byo_vnet && var.byo_vnet_route_table_id != null ? 1 : 0
 
@@ -308,10 +196,10 @@ resource "azurerm_subnet_network_security_group_association" "cassandra" {
 }
 
 resource "azurerm_subnet_route_table_association" "aca" {
-  count = local.byo_vnet && var.byo_vnet_route_table_id != null ? 1 : 0
+  count = local.byo_vnet ? 1 : 0
 
   subnet_id      = azurerm_subnet.aca[0].id
-  route_table_id = var.byo_vnet_route_table_id
+  route_table_id = azurerm_route_table.aca[0].id
 }
 
 resource "azurerm_subnet_network_security_group_association" "aca" {
@@ -319,4 +207,57 @@ resource "azurerm_subnet_network_security_group_association" "aca" {
 
   subnet_id                 = azurerm_subnet.aca[0].id
   network_security_group_id = var.byo_vnet_workload_nsg_id
+}
+
+resource "azurerm_route_table" "aca" {
+  count = local.byo_vnet ? 1 : 0
+
+  name                = "${local.name_prefix}-aca-rt"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+
+  route {
+    name           = "internet-direct"
+    address_prefix = "0.0.0.0/0"
+    next_hop_type  = "Internet"
+  }
+
+  tags = var.tags
+}
+
+resource "azurerm_public_ip" "aca_nat" {
+  count = local.byo_vnet ? 1 : 0
+
+  name                = "${local.name_prefix}-aca-nat-pip"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  allocation_method   = "Static"
+  sku                 = "Standard"
+
+  tags = var.tags
+}
+
+resource "azurerm_nat_gateway" "aca" {
+  count = local.byo_vnet ? 1 : 0
+
+  name                = "${local.name_prefix}-aca-nat"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  sku_name            = "Standard"
+
+  tags = var.tags
+}
+
+resource "azurerm_nat_gateway_public_ip_association" "aca" {
+  count = local.byo_vnet ? 1 : 0
+
+  nat_gateway_id       = azurerm_nat_gateway.aca[0].id
+  public_ip_address_id = azurerm_public_ip.aca_nat[0].id
+}
+
+resource "azurerm_subnet_nat_gateway_association" "aca" {
+  count = local.byo_vnet ? 1 : 0
+
+  subnet_id      = azurerm_subnet.aca[0].id
+  nat_gateway_id = azurerm_nat_gateway.aca[0].id
 }

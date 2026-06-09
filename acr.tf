@@ -8,7 +8,7 @@ resource "random_string" "ecr_acr_suffix" {
 }
 
 resource "azurerm_container_registry" "ecr_mirror" {
-  #checkov:skip=CKV_AZURE_139:Public access required so apply-time `az acr import` and ACI can pull; private endpoint needs Premium and breaks the import/pull flow.
+  #checkov:skip=CKV_AZURE_139:Public access required so apply-time `az acr import` and ACI/ACA can pull; private endpoint needs Premium and breaks the import flow. In forced-tunnel BYO VNets use byo_vnet_acr_internet_route instead.
   #checkov:skip=CKV_AZURE_164:Content trust is Premium-only and deprecated by Azure; not required for this template mirror.
   #checkov:skip=CKV_AZURE_165:Single-region template; geo-replication requires Premium.
   #checkov:skip=CKV_AZURE_166:Image quarantine is a Premium/preview feature; not required for this template.

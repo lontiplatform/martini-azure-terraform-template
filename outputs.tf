@@ -6,18 +6,31 @@ output "resource_group_location" {
   value = azurerm_resource_group.rg.location
 }
 
-output "app_gw_url" {
-  value = "https://${azurerm_public_ip.app_gw_pip.fqdn}"
+output "martini_ingress_fqdn" {
+  value       = local.martini_app_fqdn
+  description = "Default *.azurecontainerapps.io FQDN of the Martini app's external ingress (the app's base URL when no custom domain is bound)."
 }
 
-output "app_gw_public_ip" {
-  value = azurerm_public_ip.app_gw_pip.ip_address
+output "custom_domain_dns_records" {
+  description = "The exact DNS records to create in the zone that owns custom_domain, then set custom_domain_dns_ready = true and re-apply. Null when custom_domain is empty."
+  value = local.custom_domain_enabled ? [
+    {
+      name  = var.custom_domain
+      type  = "CNAME"
+      value = local.martini_app_fqdn
+    },
+    {
+      name  = "asuid.${var.custom_domain}"
+      type  = "TXT"
+      value = nonsensitive(var.enable_designer ? azurerm_container_app.martini_designer[0].custom_domain_verification_id : azurerm_container_app.martini[0].custom_domain_verification_id)
+    },
+  ] : null
 }
 
 output "subnet_prefixes" {
   value = local.byo_vnet ? {
     aci       = var.aci_subnet_cidr
-    appgw     = var.appgw_subnet_cidr
+    aca       = var.aca_subnet_cidr
     cassandra = var.enable_cassandra_tracker ? var.cassandra_subnet_cidr : null
     } : {
     for name, subnet in module.virtual_network[0].subnets :
@@ -74,17 +87,6 @@ output "communication_services_email_domain" {
 }
 
 output "custom_domain_url" {
-  value       = local.acmebot_enabled ? "https://${var.custom_domain}" : null
-  description = "Public HTTPS URL of the custom-domain listener once the A record for var.custom_domain is pointed at app_gw_public_ip."
-}
-
-output "acmebot_function_host" {
-  value       = local.acmebot_enabled ? local.acmebot_function_host : null
-  description = "Default hostname of the keyvault-acmebot Function App. Useful for operator debugging (e.g. log tail, manual /api/certificate POSTs)."
-}
-
-output "acmebot_function_key" {
-  value       = local.acmebot_enabled ? module.acmebot[0].api_key : null
-  description = "Default Functions API key for the keyvault-acmebot Function App. Required for any manual call to /api/certificate."
-  sensitive   = true
+  value       = local.custom_domain_enabled ? "https://${var.custom_domain}" : null
+  description = "Public HTTPS URL of the custom domain once the CNAME + asuid TXT records are in place and custom_domain_dns_ready = true has issued and bound the managed certificate."
 }

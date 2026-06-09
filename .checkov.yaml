@@ -36,31 +36,9 @@ summary-position: top
 # Exclude specific paths from scanning
 skip-path:
 - .venv/  # Exclude virtual environment directory
-- .external_modules/  # Third-party modules we don't control (acmebot, AppGW AVM, etc.)
+- .external_modules/  # Third-party modules we don't control (VNet / NAT AVM, etc.)
 
 skip-check:
 - CKV_TF_1
 - CKV_AZURE_224 # Ledger feature is currently not required for this template
 - CKV_AZURE_229 # Zone redundancy  is currently not required for this template
-# The next block suppresses checks that fire only on the upstream
-# shibayan/keyvault-acmebot module's resources (cert-renewal Function App + its
-# storage account). Inline #checkov:skip is not honored across module
-# boundaries, and the template has no other storage accounts / function apps to
-# which these checks would otherwise apply (storage.conf has its own inline
-# skips). Revisit if a future resource here should be subject to them.
-- CKV_AZURE_33  # Acmebot storage: logging not needed for ephemeral cert state
-- CKV_AZURE_43  # Acmebot storage: upstream module's naming pattern
-- CKV_AZURE_59  # Acmebot storage: must be reachable by the cert-renewal Function App
-- CKV_AZURE_206 # Acmebot storage: LRS sufficient for cert renewal state
-- CKV_AZURE_212 # Acmebot App Service Plan: failover overkill for renewal cron
-- CKV_AZURE_221 # Acmebot Function App: public ingress required so issue-cert.sh can POST
-- CKV_AZURE_225 # Acmebot App Service Plan: zone redundancy overkill for renewal cron
-# CKV2 graph checks fire on the acmebot module's storage account regardless of
-# skip-path, since they evaluate the connected graph. Our own storage account
-# (storage.tf) carries inline skips for these same checks, so these globals only
-# cover the third-party module.
-- CKV2_AZURE_1  # Acmebot storage: Microsoft-managed keys sufficient for cert state
-- CKV2_AZURE_33 # Acmebot storage: private endpoint not needed; reached by cert-renewal Function App
-- CKV2_AZURE_38 # Acmebot storage: soft-delete defaults sufficient
-- CKV2_AZURE_40 # Acmebot storage: upstream module requires shared-key auth
-- CKV2_AZURE_41 # Acmebot storage: SAS not used; upstream module
