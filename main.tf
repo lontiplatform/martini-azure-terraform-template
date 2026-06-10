@@ -84,6 +84,19 @@ locals {
     ssl            = "true"
   }) : ""
 
+  sqlserver_dbxml_rendered = var.enable_sql_server ? templatefile("${path.module}/templates/sqlserver.dbxml.tftpl", {
+    name     = var.sql_database_name
+    host     = module.sql_server[0].resource.fully_qualified_domain_name
+    port     = 1433
+    database = var.sql_database_name
+    username = azurerm_key_vault_secret.sql_admin_username.value
+    password = azurerm_key_vault_secret.sql_admin_password.value
+  }) : ""
+
+  martini_egress_ip = var.enable_sql_server ? (
+    local.byo_vnet ? azurerm_public_ip.aca_nat[0].ip_address : data.azurerm_public_ip.nat_gw[0].ip_address
+  ) : null
+
   # ACS data_location is a curated residency label, not an Azure region.
   acs_data_location_by_region = {
     eastus             = "United States"

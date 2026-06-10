@@ -83,6 +83,23 @@ resource "azurerm_storage_share_file" "tracker_dbxml" {
   content_md5       = local_file.tracker_dbxml[0].content_md5
 }
 
+resource "local_file" "sqlserver_dbxml" {
+  count = var.enable_sql_server ? 1 : 0
+
+  filename        = "${path.module}/.generated/${var.sql_database_name}.dbxml"
+  content         = local.sqlserver_dbxml_rendered
+  file_permission = "0644"
+}
+
+resource "azurerm_storage_share_file" "sqlserver_dbxml" {
+  count = var.enable_sql_server ? 1 : 0
+
+  name              = "${var.sql_database_name}.dbxml"
+  storage_share_url = azurerm_storage_share.db_pool.url
+  source            = local_file.sqlserver_dbxml[0].filename
+  content_md5       = local_file.sqlserver_dbxml[0].content_md5
+}
+
 resource "azurerm_storage_share" "designer_workspace_data" {
   count = var.enable_designer ? 1 : 0
 
@@ -102,14 +119,14 @@ resource "azurerm_storage_share" "designer_workspace_user" {
 }
 
 resource "azurerm_storage_share_directory" "designer_runtime_conf" {
-  count = var.enable_designer && var.enable_cassandra_tracker ? 1 : 0
+  count = var.enable_designer && (var.enable_cassandra_tracker || var.enable_sql_server) ? 1 : 0
 
   name              = "conf"
   storage_share_url = azurerm_storage_share.designer_workspace_data[0].url
 }
 
 resource "azurerm_storage_share_directory" "designer_runtime_db_pool" {
-  count = var.enable_designer && var.enable_cassandra_tracker ? 1 : 0
+  count = var.enable_designer && (var.enable_cassandra_tracker || var.enable_sql_server) ? 1 : 0
 
   name              = "conf/db-pool"
   storage_share_url = azurerm_storage_share.designer_workspace_data[0].url
@@ -125,6 +142,18 @@ resource "azurerm_storage_share_file" "designer_tracker_dbxml" {
   storage_share_url = azurerm_storage_share.designer_workspace_data[0].url
   source            = local_file.tracker_dbxml[0].filename
   content_md5       = local_file.tracker_dbxml[0].content_md5
+
+  depends_on = [azurerm_storage_share_directory.designer_runtime_db_pool]
+}
+
+resource "azurerm_storage_share_file" "designer_sqlserver_dbxml" {
+  count = var.enable_designer && var.enable_sql_server ? 1 : 0
+
+  name              = "${var.sql_database_name}.dbxml"
+  path              = "conf/db-pool"
+  storage_share_url = azurerm_storage_share.designer_workspace_data[0].url
+  source            = local_file.sqlserver_dbxml[0].filename
+  content_md5       = local_file.sqlserver_dbxml[0].content_md5
 
   depends_on = [azurerm_storage_share_directory.designer_runtime_db_pool]
 }
