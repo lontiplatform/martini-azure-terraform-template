@@ -1,0 +1,54 @@
+<database>
+  <name>tracker</name>
+  <autoStart>true</autoStart>
+  <type>cassandra</type>
+  <contactPoints>
+%{ for i, cp in contact_points ~}
+    <contactPoint${i}>${cp}</contactPoint${i}>
+%{ endfor ~}
+  </contactPoints>
+  <port>${port}</port>
+  <maxSchemaAgreementWaitSeconds>10</maxSchemaAgreementWaitSeconds>
+  <credentials>
+    <username>${username}</username>
+    <password><![CDATA[${password}]]></password>
+  </credentials>
+  <compression>NONE</compression>
+  <metrics>true</metrics>
+  <ssl>${ssl}</ssl>
+  <poolingOptions>
+    <coreConnectionsPerHostLocal>1</coreConnectionsPerHostLocal>
+    <coreConnectionsPerHostRemote>1</coreConnectionsPerHostRemote>
+    <maxConnectionsPerHostLocal>1</maxConnectionsPerHostLocal>
+    <maxConnectionsPerHostRemote>1</maxConnectionsPerHostRemote>
+    <newConnectionThresholdLocal>800</newConnectionThresholdLocal>
+    <newConnectionThresholdRemote>200</newConnectionThresholdRemote>
+    <maxRequestsPerConnectionLocal>1024</maxRequestsPerConnectionLocal>
+    <maxRequestsPerConnectionRemote>256</maxRequestsPerConnectionRemote>
+    <idleTimeoutSeconds>120</idleTimeoutSeconds>
+    <poolTimeoutMillis>5000</poolTimeoutMillis>
+    <maxQueueSize>256</maxQueueSize>
+    <heartbeatIntervalSeconds>30</heartbeatIntervalSeconds>
+  </poolingOptions>
+  <socketOptions>
+    <connectTimeoutMillis>5000</connectTimeoutMillis>
+    <readTimeoutMillis>12000</readTimeoutMillis>
+    <keepAlive>true</keepAlive>
+    <reuseAddress>true</reuseAddress>
+    <tcpNoDelay>true</tcpNoDelay>
+  </socketOptions>
+  <queryOptions>
+    <consistencyLevel>LOCAL_ONE</consistencyLevel>
+    <serialConsistencyLevel>SERIAL</serialConsistencyLevel>
+    <fetchSize>5000</fetchSize>
+    <defaultIdempotence>false</defaultIdempotence>
+    <prepareOnAllHosts>true</prepareOnAllHosts>
+    <reprepareOnUp>true</reprepareOnUp>
+    <refreshSchemaIntervalMillis>1000</refreshSchemaIntervalMillis>
+    <maxPendingRefreshSchemaRequests>20</maxPendingRefreshSchemaRequests>
+    <refreshNodeListIntervalMillis>1000</refreshNodeListIntervalMillis>
+    <maxPendingRefreshNodeListRequests>20</maxPendingRefreshNodeListRequests>
+    <refreshNodeIntervalMillis>1000</refreshNodeIntervalMillis>
+    <maxPendingRefreshNodeRequests>20</maxPendingRefreshNodeRequests>
+  </queryOptions>
+</database>

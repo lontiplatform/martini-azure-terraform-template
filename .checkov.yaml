@@ -36,6 +36,7 @@ summary-position: top
 # Exclude specific paths from scanning
 skip-path:
 - .venv/  # Exclude virtual environment directory
+- .external_modules/  # Third-party modules we don't control (VNet / NAT AVM, etc.)
 
 skip-check:
 - CKV_TF_1

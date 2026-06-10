@@ -1,0 +1,16 @@
+<database>
+  <name>${name}</name>
+  <autoStart>true</autoStart>
+  <type>jdbc</type>
+  <!-- Azure SQL rejects unencrypted connections and presents a publicly trusted
+       cert, so encrypt=true with trustServerCertificate=false is required. -->
+  <url>jdbc:sqlserver://${host}:${port};databaseName=${database};encrypt=true;trustServerCertificate=false;loginTimeout=30;</url>
+  <driverClassName>com.microsoft.sqlserver.jdbc.SQLServerDriver</driverClassName>
+  <username>${username}</username>
+  <password><![CDATA[${password}]]></password>
+  <useXA>false</useXA>
+  <maximumPoolSize>5</maximumPoolSize>
+  <minimumPoolSize>0</minimumPoolSize>
+  <isolationLevel>READ_COMMITTED</isolationLevel>
+  <enableJdbc4ConnectionTest>true</enableJdbc4ConnectionTest>
+</database>
